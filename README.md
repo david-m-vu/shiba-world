@@ -1,1 +1,1 @@
-# 3D Watch2Gether in three.js
+# 3D Watch2Gether with three.js
