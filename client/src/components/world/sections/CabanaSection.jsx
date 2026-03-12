@@ -39,7 +39,7 @@ const CabanaSection = ({
 
     const chairOffsetX = width * 0.25;
     const chairOffsetZ = depth * 0.25;
-    const couchOffsetX = width * 0.28;
+    const couchOffsetX = width * 0.35;
     const couchOffsetZ = depth * 0.1;
 
     return (
@@ -106,14 +106,14 @@ const CabanaSection = ({
                 position={[-couchOffsetX, 0, -(couchOffsetZ + 2)]}
                 rotation={[0, -Math.PI / 2, 0]}
                 seatSize={[8, 0.5, 2]}
-                backSize={[8, 0.5, 0.7]}
+                backSize={[8, 0.8, 0.7]}
                 {...couchProps}
             />
             <Couch
                 position={[couchOffsetX, 0, -(couchOffsetZ + 2)]}
                 rotation={[0, Math.PI / 2, 0]}
                 seatSize={[8, 0.5, 2]}
-                backSize={[8, 0.5, 0.7]}
+                backSize={[8, 0.8, 0.7]}
                 {...couchProps}
             />
 

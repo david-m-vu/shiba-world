@@ -7,7 +7,7 @@ import Couch from "../objects/Couch.jsx";
 import CoffeeTable from "../objects/CoffeeTable.jsx";
 import { Grass } from "../objects/Grass.jsx";
 
-export const LoungeSection = ({
+const LoungeSection = ({
     position = [0, 0, 0],
     rotation = [0, 0, 0],
     scale = 1,
@@ -50,18 +50,18 @@ export const LoungeSection = ({
             {...groupProps}
         >
             <Grass
-                position={[-mainHalfW, 0, -(mainPlanter.size[2] / 2 + 12.5)]}
-                size={[mainPlanter.size[0], 0.1, 3]}
-                anchor="minXminZ"
+                position={[mainHalfW, 0, -(mainPlanter.size[2] / 2 + 15)]}
+                size={[mainPlanter.size[0] - 3, 0.1, 6]}
+                anchor="maxXminZ"
             />
             <Grass
                 position={[-mainHalfW, 0, -(mainPlanter.size[2] / 2)]}
-                size={[3, 0.1, 12.5]}
+                size={[3, 0.1, 15]}
                 anchor="minXmaxZ"
             />
 
             <Planter
-                position={[mainHalfW, 0, -(mainPlanter.size[2] / 2 + 12.5 - 0.25)]}
+                position={[mainHalfW, 0, -(mainPlanter.size[2] / 2 + 15 )]}
                 size={[2,1,6]}
                 anchor="minXminZ"
                 hasPlants
@@ -92,7 +92,15 @@ export const LoungeSection = ({
                 />
             </group>
 
-            <CoffeeTable position={[0.5, 0, 5]} color={coffeeTableColor} />
+            <CoffeeTable 
+                position={[1.5, 0, 6]} 
+                color={coffeeTableColor} 
+                rigidBodyProps={{
+                    density: 6
+                }}
+            />
         </group>
     );
 };
+
+export default LoungeSection

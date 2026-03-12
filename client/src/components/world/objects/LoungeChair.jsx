@@ -1,6 +1,14 @@
 import { anchorOffset } from "../../../lib/util.js"
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 
+const defaultRigidBodyProps = {
+    type: "dynamic",
+    colliders: false,
+    density: 3,
+    linearDamping: 20,
+    angularDamping: 20,
+}
+
 // Lounge chair with a simple frame + fabric bed + angled backrest
 const LoungeChair = ({
     position = [0, 0, 0],
@@ -36,7 +44,24 @@ const LoungeChair = ({
     ];
 
     return (
-        <RigidBody type="fixed" colliders={false} position={basePosition} rotation={rotation}>
+        <RigidBody 
+            position={basePosition} 
+            rotation={rotation}
+            {...defaultRigidBodyProps}    
+        >
+            {/* frame/legs collider (prevents sinking) */}
+            <CuboidCollider
+                args={[
+                    (frameWidth * scaleVec[0]) / 2,
+                    (legHeight * scaleVec[1]) / 2,
+                    (frameDepth * scaleVec[2]) / 2,
+                ]}
+                position={[
+                    0,
+                    (legHeight / 2) * scaleVec[1],
+                    0,
+                ]}
+            />
             {/* bed collider */}
             <CuboidCollider
                 args={[

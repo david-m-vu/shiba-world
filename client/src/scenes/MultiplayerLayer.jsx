@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+import { useRapier } from "@react-three/rapier";
 import { Quaternion, Vector3 } from "three";
 import Avatar from "../components/Avatar.jsx";
 
@@ -13,7 +14,16 @@ const LOCAL_MOVE_SPEED = 12; // orig 8
 const HIDE_DISTANCE = 0.6;
 const TURN_SPEED = 8;
 const JUMP_IMPULSE = 6.5;
-const GROUND_Y = 10;
+const GROUND_RAY_OFFSET = 0.05;
+const GROUND_RAY_LENGTH = 0.25;
+const FOOT_RAY_RADIUS = 0.35;
+const FOOT_RAY_OFFSETS = [
+    [0, 0],
+    [FOOT_RAY_RADIUS, FOOT_RAY_RADIUS],
+    [FOOT_RAY_RADIUS, -FOOT_RAY_RADIUS],
+    [-FOOT_RAY_RADIUS, FOOT_RAY_RADIUS],
+    [-FOOT_RAY_RADIUS, -FOOT_RAY_RADIUS],
+];
 
 const localPlayer = {
     id: "local",
@@ -45,6 +55,7 @@ const lerpAngle = (current, target, t) => {
 
 const MultiplayerLayer = () => {
     const { camera } = useThree();
+    const { rapier, world } = useRapier();
     const controlsRef = useRef(null);
     const localRigidBodyRef = useRef(null);
     const localVisualRef = useRef(null);
@@ -60,6 +71,10 @@ const MultiplayerLayer = () => {
     const tmpQuat = useMemo(() => new Quaternion(), []);
     const jumpQueued = useRef(false);
     const currentYaw = useRef(0); // need to be a ref to persist across useFrame callss
+    const groundRay = useMemo(
+        () => new rapier.Ray({ x: 0, y: 0, z: 0 }, { x: 0, y: -1, z: 0 }),
+        [rapier]
+    );
 
     const keys = useRef({
         w: false,
@@ -106,6 +121,18 @@ const MultiplayerLayer = () => {
         const currentPos = rb.translation(); // return rigid body's current world position as a vector
         const currentVel = rb.linvel();
         localPosition.set(currentPos.x, currentPos.y, currentPos.z);
+        let grounded = false;
+        for (let i = 0; i < FOOT_RAY_OFFSETS.length; i += 1) {
+            const [offsetX, offsetZ] = FOOT_RAY_OFFSETS[i];
+            groundRay.origin.x = currentPos.x + offsetX;
+            groundRay.origin.y = currentPos.y + GROUND_RAY_OFFSET;
+            groundRay.origin.z = currentPos.z + offsetZ;
+            const hit = world.castRay(groundRay, GROUND_RAY_LENGTH, true, undefined, undefined, undefined, rb);
+            if (hit) {
+                grounded = true;
+                break;
+            }
+        }
 
         const inputX = (keys.current.d ? 1 : 0) - (keys.current.a ? 1 : 0);
         const inputZ = (keys.current.w ? 1 : 0) - (keys.current.s ? 1 : 0);
@@ -146,7 +173,6 @@ const MultiplayerLayer = () => {
 
         // jump
         if (jumpQueued.current) {
-            const grounded = Math.abs(currentVel.y) < 0.05 && currentPos.y <= GROUND_Y + 0.15;
             if (grounded) {
                 rb.applyImpulse({ x: 0, y: JUMP_IMPULSE, z: 0 }, true);
             }
