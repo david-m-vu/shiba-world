@@ -31,8 +31,8 @@ const Avatar = ({
         <group position={position} rotation={rotation} visible={!hidden}>
             {/* primitive lets us render a raw three.js object directly - attach this three.js object into the React scene graph */}
             {/* <primitive object={model} scale={scale} />  */}
-            <mesh position={[0,0.25,0]}>
-                <boxGeometry args={[0.5,0.5,0.5]}/>
+            <mesh position={[0,0.5,0]}>
+                <boxGeometry args={[1,1,1]}/>
                 <meshNormalMaterial />
             </mesh>
 

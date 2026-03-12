@@ -1,0 +1,98 @@
+/**
+ * This file handles rendering non-player objects in the room
+ */
+
+import Planter from "../objects/Planter.jsx";
+import Couch from "../objects/Couch.jsx";
+import CoffeeTable from "../objects/CoffeeTable.jsx";
+import { Grass } from "../objects/Grass.jsx";
+
+export const LoungeSection = ({
+    position = [0, 0, 0],
+    rotation = [0, 0, 0],
+    scale = 1,
+    seatColor = "#b7927e",
+    backColor = "#b08674",
+    coffeeTableColor = "#8b8278",
+    plantColor = "#2c5a3a",
+    ...groupProps
+}) => {
+    const mainPlanter = { size: [9, 1, 2], position: [0, 0, 0] };
+    const sidePlanter = { size: [1, 1, 4] };
+    const rightPlanter = { size: [2, 1, 2] };
+
+    const mainHalfW = mainPlanter.size[0] / 2;
+    const sideHalfW = sidePlanter.size[0] / 2;
+    const rightHalfW = rightPlanter.size[0] / 2;
+
+    const planterRowZ = 3;
+    const leftSideX = -(mainHalfW - sideHalfW);
+    const rightX = mainHalfW + rightHalfW;
+    const rightSideX = mainHalfW + sideHalfW;
+
+    const couchCluster = {
+        position: [-0.5, 0, 2],
+        longCouch: {
+            position: [0, 0, 0],
+            rotation: [0, Math.PI, 0],
+        },
+        shortCouch: {
+            position: [-2, 0, 2],
+            rotation: [0, -Math.PI / 2, 0],
+        },
+    };
+
+    return (
+        <group 
+            position={position} 
+            rotation={rotation} 
+            scale={scale} 
+            {...groupProps}
+        >
+            <Grass
+                position={[-mainHalfW, 0, -(mainPlanter.size[2] / 2 + 12.5)]}
+                size={[mainPlanter.size[0], 0.1, 3]}
+                anchor="minXminZ"
+            />
+            <Grass
+                position={[-mainHalfW, 0, -(mainPlanter.size[2] / 2)]}
+                size={[3, 0.1, 12.5]}
+                anchor="minXmaxZ"
+            />
+
+            <Planter
+                position={[mainHalfW, 0, -(mainPlanter.size[2] / 2 + 12.5 - 0.25)]}
+                size={[2,1,6]}
+                anchor="minXminZ"
+                hasPlants
+                plantColor={"#d6c70e"}
+            />
+
+            <CoffeeTable size={[3, 0.5, 3]} position={[1, 0, -5]} color={"#BDC5CE"} />
+
+            <Planter position={mainPlanter.position} size={mainPlanter.size} hasPlants plantColor={plantColor} />
+            <Planter position={[leftSideX, 0, planterRowZ]} size={sidePlanter.size} hasPlants plantColor={plantColor} />
+            <Planter position={[rightX, 0, 0]} size={rightPlanter.size} hasPlants plantColor={plantColor} />
+            <Planter position={[rightSideX, 0, planterRowZ]} size={sidePlanter.size} hasPlants plantColor={plantColor} />
+
+            <group position={couchCluster.position}>
+                <Couch
+                    position={couchCluster.longCouch.position}
+                    seatSize={[6, 0.5, 2]}
+                    rotation={couchCluster.longCouch.rotation}
+                    seatColor={seatColor}
+                    backColor={backColor}
+                />
+                <Couch
+                    position={couchCluster.shortCouch.position}
+                    seatSize={[6, 0.5, 2]}
+                    rotation={couchCluster.shortCouch.rotation}
+                    seatColor={seatColor}
+                    backColor={backColor}
+                />
+            </group>
+
+            <CoffeeTable position={[0.5, 0, 5]} color={coffeeTableColor} />
+        </group>
+    );
+};

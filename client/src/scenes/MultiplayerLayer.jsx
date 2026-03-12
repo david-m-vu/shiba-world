@@ -147,7 +147,7 @@ const MultiplayerLayer = () => {
                 enableDamping
                 dampingFactor={0.08}
                 minDistance={0.3}
-                maxDistance={25}
+                maxDistance={100} // orig 25
                 enablePan={false}
             />
 

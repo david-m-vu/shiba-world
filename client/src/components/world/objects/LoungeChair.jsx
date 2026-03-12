@@ -1,0 +1,94 @@
+import { anchorOffset } from "../../../lib/util.js"
+
+// Lounge chair with a simple frame + fabric bed + angled backrest
+const LoungeChair = ({
+    position = [0, 0, 0],
+    rotation = [0, 0, 0],
+    scale = 1,
+    anchor = "center",
+    bedSize = [2.2, 0.12, 4.8], // [width (x), thickness (y), depth (z)]
+    frameThickness = 0.12,
+    legHeight = 0.55,
+    backrestHeight = 1.1,
+    backrestAngle = 0.45, // radians, leans toward +Z
+    frameColor = "#3d4a55",
+    fabricColor = "#6d7a84",
+    ...groupProps
+}) => {
+    const frameWidth = bedSize[0] + frameThickness * 2;
+    const frameDepth = bedSize[2] + frameThickness * 2;
+    const anchorShift = anchorOffset([frameWidth, 0, frameDepth], anchor);
+
+    const railY = legHeight - frameThickness / 2; // legs are slightly inside frame
+    const railZOffset = frameDepth / 2 - frameThickness / 2; // offset from the center
+    const railXOffset = frameWidth / 2 - frameThickness / 2; // offset from the center
+
+    const bedY = legHeight + bedSize[1] / 2;
+    const backrestZ = frameDepth / 2 - frameThickness;
+    const backrestY = legHeight + bedSize[1] + backrestHeight / 2 - 0.03;
+
+    return (
+        <group
+            position={[
+                position[0] + anchorShift[0],
+                position[1],
+                position[2] + anchorShift[2],
+            ]}
+            rotation={rotation}
+            scale={scale}
+            {...groupProps}
+        >
+            {/* legs */}
+            {[
+                [railXOffset, legHeight / 2, railZOffset],
+                [-railXOffset, legHeight / 2, railZOffset],
+                [railXOffset, legHeight / 2, -railZOffset],
+                [-railXOffset, legHeight / 2, -railZOffset],
+            ].map((pos, index) => (
+                <mesh key={`leg-${index}`} position={pos} castShadow receiveShadow>
+                    <boxGeometry args={[frameThickness, legHeight, frameThickness]} />
+                    <meshStandardMaterial color={frameColor} roughness={0.5} metalness={0.2} />
+                </mesh>
+            ))}
+
+            {/* side rails */}
+            <mesh position={[railXOffset, railY, 0]} castShadow receiveShadow>
+                <boxGeometry args={[frameThickness, frameThickness, frameDepth]} />
+                <meshStandardMaterial color={frameColor} roughness={0.5} metalness={0.2} />
+            </mesh>
+            <mesh position={[-railXOffset, railY, 0]} castShadow receiveShadow>
+                <boxGeometry args={[frameThickness, frameThickness, frameDepth]} />
+                <meshStandardMaterial color={frameColor} roughness={0.5} metalness={0.2} />
+            </mesh>
+
+            {/* front/back rails */}
+            <mesh position={[0, railY, railZOffset]} castShadow receiveShadow>
+                <boxGeometry args={[frameWidth, frameThickness, frameThickness]} />
+                <meshStandardMaterial color={frameColor} roughness={0.5} metalness={0.2} />
+            </mesh>
+            <mesh position={[0, railY, -railZOffset]} castShadow receiveShadow>
+                <boxGeometry args={[frameWidth, frameThickness, frameThickness]} />
+                <meshStandardMaterial color={frameColor} roughness={0.5} metalness={0.2} />
+            </mesh>
+
+            {/* fabric bed */}
+            <mesh position={[0, bedY, 0]} castShadow receiveShadow>
+                <boxGeometry args={bedSize} />
+                <meshStandardMaterial color={fabricColor} roughness={0.8} metalness={0} />
+            </mesh>
+
+            {/* backrest */}
+            <mesh
+                position={[0, backrestY, backrestZ]}
+                rotation={[backrestAngle, 0, 0]}
+                castShadow
+                receiveShadow
+            >
+                <boxGeometry args={[bedSize[0], backrestHeight, bedSize[1]]} />
+                <meshStandardMaterial color={fabricColor} roughness={0.85} metalness={0} />
+            </mesh>
+        </group>
+    );
+};
+
+export default LoungeChair;

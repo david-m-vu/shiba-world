@@ -6,12 +6,20 @@ import { useEffect, useRef, useState } from "react";
 import { Sky } from "@react-three/drei";
 import { GUI } from "dat.gui";
 
-import { PerimeterRailing, Couch, CoffeeTable } from "../components/WorldObjects.jsx";
+import { LoungeChairSection, LoungeSection, CabanaSection } from "../components/world/sections/index.js";
+import {
+    CoffeeTable,
+    Couch,
+    LoungeChair,
+    PerimeterRailing,
+    Planter,
+    Slab,
+} from "../components/world/objects/index.js";
 
-const SUN_POSITION = [18, 28, 10];
-const ROOFTOP_SIZE = [50, 40, 20];
+const SUN_POSITION = [-18, 38, -20];
+const ROOFTOP_SIZE = [60, 30, 30];
 const ROOFTOP_Y = 0;
-const BASE_Y = -20;
+const BASE_Y = -30;
 const SKYLINE_BUILDINGS = [
     { position: [-140, 10, -120], size: [18, 20, 12] },
     { position: [-110, 16, -140], size: [14, 32, 10] },
@@ -36,8 +44,9 @@ const RAILING_DEPTH = 0.25;
 const DEFAULT_COLORS = {
     background: "#9fc4ff",
     fog: "#9fc4ff",
-    rooftopSurface: "#E0DCD9",
+    rooftopSurface: "#DBDAD6",
     rooftopSlab: "#c6e0c7",
+    rooftopStairBulkhead: "#db9547",
     railing: "#314563",
     couchSeat: "#b7927e",
     couchBack: "#b08674",
@@ -45,6 +54,8 @@ const DEFAULT_COLORS = {
     skyline: "#c6e0c7",
     skylineEmissive: "#1a1f2a",
     ground: "#6d747d",
+    plant: "#2c5a3a",
+    loungeChairSectionGround: "#70a3ad"
 };
 
 const SharedEnvironment = ({ debug = false }) => {
@@ -54,8 +65,17 @@ const SharedEnvironment = ({ debug = false }) => {
 
     useEffect(() => {
         if (!showGui) return;
+        const safeDestroy = (gui) => {
+            if (!gui) return;
+            try {
+                gui.destroy();
+            } catch (error) {
+                // Ignore double-destroy errors from dat.gui in strict mode
+            }
+        };
         if (guiRef.current) {
-            guiRef.current.destroy();
+            safeDestroy(guiRef.current);
+            guiRef.current = null;
         }
 
         const gui = new GUI({ width: 300, name: "World Colors" });
@@ -79,6 +99,8 @@ const SharedEnvironment = ({ debug = false }) => {
         addFolderColor(rooftop, "rooftopSurface", "Surface");
         addFolderColor(rooftop, "rooftopSlab", "Slab");
         addFolderColor(rooftop, "railing", "Railings");
+        addFolderColor(rooftop, "rooftopStairBulkhead", "Stair Bulkhead")
+        addFolderColor(rooftop, "loungeChairSectionGround", "Secondary Ground")
 
         const furniture = gui.addFolder("Furniture");
         furniture.open();
@@ -86,13 +108,20 @@ const SharedEnvironment = ({ debug = false }) => {
         addFolderColor(furniture, "couchBack", "Couch Back");
         addFolderColor(furniture, "coffeeTable", "Coffee Table");
 
+        const plants = gui.addFolder("Plants");
+        plants.open();
+        addFolderColor(plants, "plant", "Plant");
+
         const skyline = gui.addFolder("Skyline");
         skyline.open();
         addFolderColor(skyline, "skyline", "Buildings");
         addFolderColor(skyline, "skylineEmissive", "Emissive");
         addFolderColor(skyline, "ground", "Ground");
 
-        return () => gui.destroy();
+        return () => {
+            safeDestroy(guiRef.current);
+            guiRef.current = null;
+        };
     }, [showGui]);
 
     return (
@@ -108,10 +137,10 @@ const SharedEnvironment = ({ debug = false }) => {
                 position={SUN_POSITION}
                 shadow-mapSize-width={2048} // horizontal resolution of the shadow texture
                 shadow-mapSize-height={2048} // vertical resolution of the shadow texture
-                shadow-camera-left={-70}
-                shadow-camera-right={70}
-                shadow-camera-top={70}
-                shadow-camera-bottom={-70}
+                shadow-camera-left={-50}
+                shadow-camera-right={50}
+                shadow-camera-top={50}
+                shadow-camera-bottom={-50}
                 shadow-camera-near={1}
                 shadow-camera-far={120}
             />
@@ -126,26 +155,37 @@ const SharedEnvironment = ({ debug = false }) => {
                 mieDirectionalG={0.85}
             />
 
-            {/* rooftop surface */}
-            <mesh rotation-x={-Math.PI / 2} position={[0, ROOFTOP_Y + 0.01, 0]} receiveShadow>
-                <planeGeometry args={[ROOFTOP_SIZE[0], ROOFTOP_SIZE[2]]} />
-                <meshStandardMaterial color={colors.rooftopSurface} roughness={0.75} metalness={0.05} />
-            </mesh>
+            
+            <group>
+                {/* rooftop surface */}
+                <mesh rotation-x={-Math.PI / 2} position={[0, ROOFTOP_Y + 0.01, 0]} receiveShadow>
+                    <planeGeometry args={[ROOFTOP_SIZE[0], ROOFTOP_SIZE[2]]} />
+                    <meshStandardMaterial color={colors.rooftopSurface} roughness={0.75} metalness={0.05} />
+                </mesh>
 
-            {/* rooftop slab */}
-            <mesh position={[0, ROOFTOP_Y - (ROOFTOP_SIZE[1] / 2), 0]} receiveShadow castShadow>
-                <boxGeometry args={ROOFTOP_SIZE} />
-                <meshStandardMaterial color={colors.rooftopSlab} roughness={0.8} />
-            </mesh>
+                {/* rooftop slab */}
+                <Slab 
+                    position={[0, BASE_Y, 0]}
+                    size={ROOFTOP_SIZE}
+                    color={colors.rooftopSlab}
+                    roughness={0.8}
+                />
+                
+                {/* rooftop stair bulkhead */}
+                <Slab 
+                    position={[-ROOFTOP_SIZE[0] / 2, BASE_Y, -ROOFTOP_SIZE[2] / 2]}
+                    size={[11, ROOFTOP_SIZE[1] + 8, 8]}
+                    anchor="minXmaxZ"
+                    color={colors.rooftopStairBulkhead}
+                />
+            </group>
+            
+            
+
 
             {/* front and back railings */}
             <PerimeterRailing 
                 position={[0, ROOFTOP_Y, (ROOFTOP_SIZE[2] / 2) - (RAILING_DEPTH / 2)]} 
-                args={[ROOFTOP_SIZE[0], 1.2, RAILING_DEPTH]} 
-                color={colors.railing} 
-            />
-            <PerimeterRailing 
-                position={[0, ROOFTOP_Y, -((ROOFTOP_SIZE[2] / 2) - (RAILING_DEPTH / 2))]} 
                 args={[ROOFTOP_SIZE[0], 1.2, RAILING_DEPTH]} 
                 color={colors.railing} 
             />
@@ -161,8 +201,49 @@ const SharedEnvironment = ({ debug = false }) => {
                 color={colors.railing} 
             />
 
+            {/* left side */}
+            <LoungeSection
+                position={[-(ROOFTOP_SIZE[0] / 2 - 4.5 - RAILING_DEPTH), ROOFTOP_Y + 0.01, 1]}
+                seatColor={colors.couchSeat}
+                backColor={colors.couchBack}
+                coffeeTableColor={colors.coffeeTable}
+                plantColor={colors.plant}
+            />
+
+            {/* middle */}
+            <Slab 
+                position={[-15, BASE_Y, -ROOFTOP_SIZE[2] / 2]}
+                size={[30, ROOFTOP_SIZE[1] + 5, 8]}
+                anchor="minXmaxZ"
+                color={colors.rooftopSlab}
+            />
+
+            <LoungeChairSection 
+                position={[0,0,3]}
+                planterProps={{
+                    plantColor: "#db5454"
+                }}
+                chairSpacingX={4}
+                groundColor={colors.loungeChairSectionGround}
+            />
+
+            <Planter 
+                position={[0, 0, -(ROOFTOP_SIZE[2] / 2 - 1.5)]}
+                size={[30,1.5,3]}
+                hasPlants
+            />
+
+            {/* right */}
+            <CabanaSection 
+                position={[23,0,0]}
+                size={[10,5,20]}
+                rotation={[0,Math.PI,0]}
+                tvFrameSize={[3.2, 1.7, 0.12]}
+                tvScreenSize={[3.0, 1.6, 0.06]}
+            />
+
             {/* lounge seating */}
-            <Couch
+            {/* <Couch
                 position={[8, ROOFTOP_Y + 0.01, 7]}
                 seatSize={[6, 0.5, 2]}
                 seatColor={colors.couchSeat}
@@ -176,9 +257,10 @@ const SharedEnvironment = ({ debug = false }) => {
                 backColor={colors.couchBack}
             />
 
-            {/* coffee tables */}
+            <Planter position={[0, ROOFTOP_Y, 0]} size={[9, 1, 2]} anchor="minXminZ" />
+
             <CoffeeTable position={[3.5, ROOFTOP_Y + 0.01, 5.5]} color={colors.coffeeTable} />
-            <CoffeeTable position={[12.5, ROOFTOP_Y + 0.01, 5.5]} color={colors.coffeeTable} />
+            <CoffeeTable position={[12.5, ROOFTOP_Y + 0.01, 5.5]} color={colors.coffeeTable} /> */}
 
             {/* skyline backdrop */}
             <group>
