@@ -7,9 +7,9 @@ const LoungeChairSection = ({
     rotation = [0, 0, 0],
     scale = 1,
     chairsPerGroup = 3,
-    chairSpacingX = 3, // center to center spacing
+    chairSpacingX = 4, // center to center spacing
     groupGapX = 4,
-    rowSpacingZ = 9, // center to center spacing
+    rowSpacingZ = 11, // center to center spacing
     chairProps = {},
     planterProps = {},
     planterDepth = 2,
@@ -34,7 +34,7 @@ const LoungeChairSection = ({
     const groupCenters = [-groupOffsetX, groupOffsetX]; // centers for each group along the same row
     const rowCenters = [-rowSpacingZ / 2, rowSpacingZ / 2]; // centers for the rows
 
-    const backSlabZMargin = 1
+    const backSlabZMargin = 2
     const backSlabZ = -(planterDepth + (chairProps.bedSize ?? 4.8) + (frameThickness * 2) + (planterSize[2] / 2) + backSlabZMargin)
 
     return (
@@ -86,6 +86,7 @@ const LoungeChairSection = ({
                 
                 return (
                     <Slab 
+                        key={`slab-${groupIndex}`}
                         position={[backSlabX, 0, backSlabZ]}
                         size={[planterSize[0] + 2, planterSize[1], planterSize[2]]}
                         color="#8b8278"

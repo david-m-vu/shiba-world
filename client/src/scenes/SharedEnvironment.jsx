@@ -3,8 +3,9 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Sky } from "@react-three/drei";
+import { Sky, useGLTF } from "@react-three/drei";
 import { GUI } from "dat.gui";
+import { CuboidCollider, RigidBody } from "@react-three/rapier";
 
 import { LoungeChairSection, LoungeSection, CabanaSection } from "../components/world/sections/index.js";
 import {
@@ -16,10 +17,13 @@ import {
     Slab,
 } from "../components/world/objects/index.js";
 
+const GGB_URL = new URL("../assets/golden_gate_bridge/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
+
 const SUN_POSITION = [-18, 38, -20];
 const ROOFTOP_SIZE = [60, 30, 30];
 const ROOFTOP_Y = 0;
 const BASE_Y = -30;
+const BULKHEAD_SIZE = [11, ROOFTOP_SIZE[1] + 8, 8]
 const SKYLINE_BUILDINGS = [
     { position: [-140, 10, -120], size: [18, 20, 12] },
     { position: [-110, 16, -140], size: [14, 32, 10] },
@@ -63,13 +67,25 @@ const SharedEnvironment = ({ debug = false }) => {
     const [colors, setColors] = useState(DEFAULT_COLORS);
     const guiRef = useRef(null);
 
+    const { scene: ggbModel } = useGLTF(GGB_URL);
+
+    useEffect(() => {
+        // walk every child in the gltf scene graph, and for each mesh, make it so it casts shadows and receives shadows
+        ggbModel.traverse((child) => { 
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+    }, [ggbModel]);
+
     useEffect(() => {
         if (!showGui) return;
         const safeDestroy = (gui) => {
             if (!gui) return;
             try {
                 gui.destroy();
-            } catch (error) {
+            } catch {
                 // Ignore double-destroy errors from dat.gui in strict mode
             }
         };
@@ -155,28 +171,42 @@ const SharedEnvironment = ({ debug = false }) => {
                 mieDirectionalG={0.85}
             />
 
-            
+            {/* rooftop blocks */}
             <group>
-                {/* rooftop surface */}
-                <mesh rotation-x={-Math.PI / 2} position={[0, ROOFTOP_Y + 0.01, 0]} receiveShadow>
-                    <planeGeometry args={[ROOFTOP_SIZE[0], ROOFTOP_SIZE[2]]} />
-                    <meshStandardMaterial color={colors.rooftopSurface} roughness={0.75} metalness={0.05} />
-                </mesh>
-
                 {/* rooftop slab */}
                 <Slab 
                     position={[0, BASE_Y, 0]}
                     size={ROOFTOP_SIZE}
                     color={colors.rooftopSlab}
                     roughness={0.8}
+                    hasSeparateSurface
+                    surfaceColor={colors.rooftopSurface}
                 />
                 
                 {/* rooftop stair bulkhead */}
                 <Slab 
                     position={[-ROOFTOP_SIZE[0] / 2, BASE_Y, -ROOFTOP_SIZE[2] / 2]}
-                    size={[11, ROOFTOP_SIZE[1] + 8, 8]}
+                    size={BULKHEAD_SIZE}
                     anchor="minXmaxZ"
                     color={colors.rooftopStairBulkhead}
+                />
+
+                {/* bulkhead entrance */}
+                <Slab 
+                    position={[-(ROOFTOP_SIZE[0] / 2 - BULKHEAD_SIZE[0]), BASE_Y, -(ROOFTOP_SIZE[2] / 2)]}
+                    size={[4, ROOFTOP_SIZE[1], 8]}
+                    anchor="minXmaxZ"
+                    hasSeparateSurface
+                    surfaceColor={colors.rooftopSurface}
+                />
+
+                {/* entrance slab */}
+                <Slab 
+                    position={[ROOFTOP_SIZE[0] / 2, BASE_Y, -(ROOFTOP_SIZE[2] / 2)]}
+                    size={[15, ROOFTOP_SIZE[1], 8]}
+                    anchor="maxXmaxZ"
+                    hasSeparateSurface
+                    surfaceColor={colors.rooftopSurface}
                 />
             </group>
             
@@ -189,11 +219,26 @@ const SharedEnvironment = ({ debug = false }) => {
                 args={[ROOFTOP_SIZE[0], 1.2, RAILING_DEPTH]} 
                 color={colors.railing} 
             />
+            <PerimeterRailing 
+                position={[-(ROOFTOP_SIZE[0] / 2 - BULKHEAD_SIZE[0]), 0, -(ROOFTOP_SIZE[2] / 2 + BULKHEAD_SIZE[2])]} 
+                args={[4, 2, RAILING_DEPTH]} 
+                color={colors.railing} 
+                anchor="minXminZ"
+            />
+            <PerimeterRailing 
+                position={[(ROOFTOP_SIZE[0] / 2), 0, -(ROOFTOP_SIZE[2] / 2 + BULKHEAD_SIZE[2])]} 
+                args={[15, 2, RAILING_DEPTH]} 
+                color={colors.railing} 
+                anchor="maxXminZ"
+            />
+
+
             {/* left and right railings */}
             <PerimeterRailing 
-                position={[(ROOFTOP_SIZE[0] / 2) - (RAILING_DEPTH / 2), ROOFTOP_Y, 0]} 
-                args={[RAILING_DEPTH, 1.2, ROOFTOP_SIZE[2]]} 
+                position={[(ROOFTOP_SIZE[0] / 2), ROOFTOP_Y, ROOFTOP_SIZE[2] / 2]} 
+                args={[RAILING_DEPTH, 1.2, ROOFTOP_SIZE[2] + BULKHEAD_SIZE[2]]} 
                 color={colors.railing} 
+                anchor="maxXmaxZ"
             />
             <PerimeterRailing 
                 position={[-((ROOFTOP_SIZE[0] / 2) - (RAILING_DEPTH / 2)), ROOFTOP_Y, 0]} 
@@ -242,26 +287,6 @@ const SharedEnvironment = ({ debug = false }) => {
                 tvScreenSize={[3.0, 1.6, 0.06]}
             />
 
-            {/* lounge seating */}
-            {/* <Couch
-                position={[8, ROOFTOP_Y + 0.01, 7]}
-                seatSize={[6, 0.5, 2]}
-                seatColor={colors.couchSeat}
-                backColor={colors.couchBack}
-            />
-            <Couch
-                position={[8, ROOFTOP_Y + 0.01, 4]}
-                seatSize={[6, 0.5, 2]}
-                rotation={[0, Math.PI, 0]}
-                seatColor={colors.couchSeat}
-                backColor={colors.couchBack}
-            />
-
-            <Planter position={[0, ROOFTOP_Y, 0]} size={[9, 1, 2]} anchor="minXminZ" />
-
-            <CoffeeTable position={[3.5, ROOFTOP_Y + 0.01, 5.5]} color={colors.coffeeTable} />
-            <CoffeeTable position={[12.5, ROOFTOP_Y + 0.01, 5.5]} color={colors.coffeeTable} /> */}
-
             {/* skyline backdrop */}
             <group>
                 {SKYLINE_BUILDINGS.map((building, index) => (
@@ -287,10 +312,19 @@ const SharedEnvironment = ({ debug = false }) => {
             </group>
 
             {/* distant ground for skyline */}
-            <mesh rotation-x={-Math.PI / 2} position={[0, BASE_Y, 0]} receiveShadow>
-                <planeGeometry args={[500, 500]} />
-                <meshStandardMaterial color={colors.ground} roughness={1} />
-            </mesh>
+            <RigidBody type="fixed" colliders={false} position={[0, BASE_Y, 0]}>
+                <CuboidCollider args={[250, 0.1, 250]} position={[0, -0.1, 0]} />
+                <mesh rotation-x={-Math.PI / 2} receiveShadow>
+                    <planeGeometry args={[500, 500]} />
+                    <meshStandardMaterial color={colors.ground} roughness={1} />
+                </mesh>
+            </RigidBody>
+
+            <primitive 
+                object={ggbModel} 
+                scale={30} 
+                position={[0,-10,150]}
+            />
 
             {debug ? (
                 <>

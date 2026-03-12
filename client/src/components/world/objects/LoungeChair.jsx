@@ -1,4 +1,5 @@
 import { anchorOffset } from "../../../lib/util.js"
+import { CuboidCollider, RigidBody } from "@react-three/rapier";
 
 // Lounge chair with a simple frame + fabric bed + angled backrest
 const LoungeChair = ({
@@ -27,17 +28,43 @@ const LoungeChair = ({
     const backrestZ = frameDepth / 2 - frameThickness;
     const backrestY = legHeight + bedSize[1] + backrestHeight / 2 - 0.03;
 
+    const scaleVec = Array.isArray(scale) ? scale : [scale, scale, scale];
+    const basePosition = [
+        position[0] + anchorShift[0],
+        position[1],
+        position[2] + anchorShift[2],
+    ];
+
     return (
-        <group
-            position={[
-                position[0] + anchorShift[0],
-                position[1],
-                position[2] + anchorShift[2],
-            ]}
-            rotation={rotation}
-            scale={scale}
-            {...groupProps}
-        >
+        <RigidBody type="fixed" colliders={false} position={basePosition} rotation={rotation}>
+            {/* bed collider */}
+            <CuboidCollider
+                args={[
+                    (bedSize[0] * scaleVec[0]) / 2,
+                    (bedSize[1] * scaleVec[1]) / 2,
+                    (bedSize[2] * scaleVec[2]) / 2,
+                ]}
+                position={[
+                    0,
+                    bedY * scaleVec[1],
+                    0,
+                ]}
+            />
+            {/* backrest collider */}
+            <CuboidCollider
+                args={[
+                    (bedSize[0] * scaleVec[0]) / 2,
+                    (backrestHeight * scaleVec[1]) / 2,
+                    (bedSize[1] * scaleVec[2]) / 2,
+                ]}
+                position={[
+                    0,
+                    backrestY * scaleVec[1],
+                    backrestZ * scaleVec[2],
+                ]}
+                rotation={[backrestAngle, 0, 0]}
+            />
+            <group scale={scale} {...groupProps}>
             {/* legs */}
             {[
                 [railXOffset, legHeight / 2, railZOffset],
@@ -87,7 +114,8 @@ const LoungeChair = ({
                 <boxGeometry args={[bedSize[0], backrestHeight, bedSize[1]]} />
                 <meshStandardMaterial color={fabricColor} roughness={0.85} metalness={0} />
             </mesh>
-        </group>
+            </group>
+        </RigidBody>
     );
 };
 

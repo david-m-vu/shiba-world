@@ -4,6 +4,8 @@
 
 import { useEffect, useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
+import { RigidBody } from "@react-three/rapier";
+
 const DOG_URL = new URL("../assets/shiba/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
 
 const Avatar = ({
@@ -11,6 +13,10 @@ const Avatar = ({
     rotation = [0, 0, 0],
     scale = 1,
     hidden = false,
+    usePhysics = false,
+    rigidBodyRef = null,
+    rigidBodyProps = {},
+    visualRef = null, // represents the group ref
 }) => {
     const { scene } = useGLTF(DOG_URL); // load GLTF file, and also cache result so multiple avatars can reuse the same loaded data
 
@@ -27,15 +33,33 @@ const Avatar = ({
         });
     }, [model]);
 
-    return (
-        <group position={position} rotation={rotation} visible={!hidden}>
+    const body = (
+        <group ref={visualRef} visible={!hidden} scale={scale}>
             {/* primitive lets us render a raw three.js object directly - attach this three.js object into the React scene graph */}
             {/* <primitive object={model} scale={scale} />  */}
-            <mesh position={[0,0.5,0]}>
-                <boxGeometry args={[1,1,1]}/>
+            <mesh position={[0, 0.5, 0]}>
+                <boxGeometry args={[1, 1, 1]} />
                 <meshNormalMaterial />
             </mesh>
+        </group>
+    );
 
+    if (usePhysics) {
+        return (
+            <RigidBody
+                ref={rigidBodyRef}
+                position={position}
+                rotation={rotation}
+                {...rigidBodyProps}
+            >
+                {body}
+            </RigidBody>
+        );
+    }
+
+    return (
+        <group position={position} rotation={rotation}>
+            {body}
         </group>
     );
 };

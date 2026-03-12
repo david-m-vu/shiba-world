@@ -1,0 +1,11 @@
+Model Information:
+* title:	Golden Gate Bridge
+* source:	https://sketchfab.com/3d-models/golden-gate-bridge-a0ee5a9c285849c0819af5f366be3835
+* author:	JuanG3D (https://sketchfab.com/juang3d)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Golden Gate Bridge" (https://sketchfab.com/3d-models/golden-gate-bridge-a0ee5a9c285849c0819af5f366be3835) by JuanG3D (https://sketchfab.com/juang3d) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

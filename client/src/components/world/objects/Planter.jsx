@@ -1,4 +1,5 @@
 import { anchorOffset } from "../../../lib/util.js"
+import { CuboidCollider, RigidBody } from "@react-three/rapier";
 
 // Planters treat y position as the base position
 const Planter = ({
@@ -16,6 +17,22 @@ const Planter = ({
     ...groupProps
 }) => {
     const anchorShift = anchorOffset(size, anchor);
+    const scaleVec = Array.isArray(scale) ? scale : [scale, scale, scale];
+    const basePosition = [
+        position[0] + anchorShift[0],
+        position[1],
+        position[2] + anchorShift[2],
+    ];
+    const colliderCenter = [
+        0,
+        (size[1] / 2) * scaleVec[1],
+        0,
+    ];
+    const colliderHalf = [
+        (size[0] * scaleVec[0]) / 2,
+        (size[1] * scaleVec[1]) / 2,
+        (size[2] * scaleVec[2]) / 2,
+    ];
     const baseThickness = wallThickness;
     const wallHeight = size[1];
     const dirtSize = [
@@ -33,16 +50,9 @@ const Planter = ({
     const plantYOffset = baseThickness + dirtSize[1] + plantSize[1] / 2;
 
     return (
-        <group
-            position={[
-                position[0] + anchorShift[0],
-                position[1],
-                position[2] + anchorShift[2],
-            ]}
-            rotation={rotation}
-            scale={scale}
-            {...groupProps}
-        >
+        <RigidBody type="fixed" colliders={false} position={basePosition} rotation={rotation}>
+            <CuboidCollider args={colliderHalf} position={colliderCenter} />
+            <group scale={scale} {...groupProps}>
             {/* container base */}
             <mesh position={[0, baseThickness / 2, 0]} castShadow receiveShadow>
                 <boxGeometry args={[size[0], baseThickness, size[2]]} />
@@ -84,7 +94,8 @@ const Planter = ({
                     <meshStandardMaterial color={plantColor} transparent opacity={0.9} />
                 </mesh>
             ) : null}
-        </group>
+            </group>
+        </RigidBody>
     )
 }
 

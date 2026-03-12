@@ -5,6 +5,7 @@
 import SharedEnvironment from "./SharedEnvironment.jsx";
 import MultiplayerLayer from "./MultiplayerLayer.jsx";
 
+
 const isDevMode = import.meta.env.VITE_DEV_MODE === "true"
 
 const WorldShell = () => {
