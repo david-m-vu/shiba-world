@@ -8,7 +8,7 @@ import { GUI } from "dat.gui";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import PreethamSky from "../components/PreethamSky.jsx";
 
-import { LoungeChairSection, LoungeSection, CabanaSection, PlayAreaSection } from "../components/world/sections/index.js";
+import { LoungeChairSection, LoungeSection, CabanaSection, PlayAreaSection, DiningSetSection } from "../components/world/sections/index.js";
 import {
     CoffeeTable,
     Couch,
@@ -39,7 +39,11 @@ const DEFAULT_COLORS = {
     plant: "#2c5a3a",
     loungeChairSectionGround: "#70a3ad",
     frame: "#db9547",
-    overhangSlab: "#314563"
+    overhangSlab: "#314563",
+    ocean: "#60899F", // orig #5f7f98
+    oceanHighlight: "#83aac4",
+    sunsetLight: "#fb7739",
+    canopyLight: "#fff1d1" // #efb92e for more orange
 };
 
 const SKY_PARAMS = {
@@ -78,27 +82,168 @@ const CANTILEVER_LIGHT_POSITIONS = Array.from({ length: CANTILEVER_LIGHT_COUNT }
     CANTILEVER_LIGHT_Z,
 ]);
 
-const SKYLINE_BUILDINGS = [
-    { position: [-140, 10, -120], size: [18, 20, 12] },
-    { position: [-110, 16, -140], size: [14, 32, 10] },
-    { position: [-70, 12, -150], size: [22, 24, 14] },
-    { position: [-20, 18, -155], size: [16, 36, 12] },
-    { position: [30, 14, -150], size: [20, 28, 14] },
-    { position: [80, 10, -140], size: [18, 20, 12] },
-    { position: [125, 12, -115], size: [22, 24, 16] },
-    { position: [150, 10, -70], size: [18, 20, 12] },
-    { position: [155, 14, -20], size: [20, 28, 14] },
-    { position: [150, 12, 40], size: [18, 24, 12] },
-    { position: [120, 16, 90], size: [14, 32, 10] },
-    { position: [70, 12, 130], size: [20, 24, 14] },
+const RAILING_DEPTH = 0.25;
+const GROUND_SIZE = [1000, 500];
+const OCEAN_POSITION = [0, BASE_Y - 0.25, 0];
+const OCEAN_SIZE = [1200, 1320];
+const OCEAN_SURFACE_OFFSET = 0.02;
 
-    { position: [-90, 14, 130], size: [18, 28, 12] },
-    { position: [-130, 12, 90], size: [20, 24, 14] },
-    { position: [-150, 10, 40], size: [18, 20, 12] },
-    { position: [-155, 14, -20], size: [20, 28, 14] },
+// pseudo rng counter-based to produce a predictable sequence of numbers based on an inital seed (generates [0, 1))
+const createDeterministicRandom = (seed) => {
+    // unsigned right shift to force value into a 32 bit unsigned integer
+    let state = seed >>> 0;
+    // return a closure that remembers this state variable
+    return () => {
+        state += 0x6D2B79F5; // move state forward by a large constant to ensure generator doesn't repeat itself
+        let t = state;
+        // scramble bits
+        t = Math.imul(t ^ (t >>> 15), t | 1);  // mix top half with bottom half, then multiply by an odd number so that no informatio nis "lost" due to zeros shifting in
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296; // 4294967296 is 2^32. convert 32 integer into a decimal between 0 and 1
+    };
+};
+
+// generates a random number between min and max
+const randomRange = (rng, min, max) => min + (max - min) * rng();
+
+const SKYLINE_LAYERS = [
+    {
+        name: "near",
+        count: 55,
+        radiusMin: 60,
+        radiusMax: 170,
+        widthMin: 12,
+        widthMax: 24,
+        depthMin: 10,
+        depthMax: 22,
+        heightMin: 24,
+        heightMax: 56,
+        sectorCount: 10,
+        sectorJitter: 0.22,
+        tallAccentChance: 0.2,
+        setbackChance: 0.6,
+        windowChance: 0.92,
+        emissiveMin: 0.15,
+        emissiveMax: 0.22,
+        windowOpacityMin: 0.12,
+        windowOpacityMax: 0.2,
+    },
+    {
+        name: "mid",
+        count: 46,
+        radiusMin: 165,
+        radiusMax: 230,
+        widthMin: 10,
+        widthMax: 22,
+        depthMin: 9,
+        depthMax: 20,
+        heightMin: 20,
+        heightMax: 50,
+        sectorCount: 12,
+        sectorJitter: 0.18,
+        tallAccentChance: 0.12,
+        setbackChance: 0.45,
+        windowChance: 0.84,
+        emissiveMin: 0.1,
+        emissiveMax: 0.18,
+        windowOpacityMin: 0.08,
+        windowOpacityMax: 0.16,
+    },
+    {
+        name: "far",
+        count: 56,
+        radiusMin: 220,
+        radiusMax: 260,
+        widthMin: 8,
+        widthMax: 18,
+        depthMin: 8,
+        depthMax: 18,
+        heightMin: 14,
+        heightMax: 40,
+        sectorCount: 14,
+        sectorJitter: 0.16,
+        tallAccentChance: 0.08,
+        setbackChance: 0.3,
+        windowChance: 0.68,
+        emissiveMin: 0.06,
+        emissiveMax: 0.14,
+        windowOpacityMin: 0.06,
+        windowOpacityMax: 0.12,
+    },
 ];
 
-const RAILING_DEPTH = 0.25;
+const generateSkylineBuildings = (seed = 20260313) => {
+    const rng = createDeterministicRandom(seed);
+    const buildings = [];
+
+    SKYLINE_LAYERS.forEach((layer, layerIndex) => {
+        // each building picks one sector and gets a random angle inside that slicesector
+        const arcPerSector = (Math.PI * 2) / layer.sectorCount; 
+
+        // for each building in layer
+        for (let i = 0; i < layer.count; i++) {
+            const sector = Math.floor(rng() * layer.sectorCount); // random sector index
+            const angle = (sector * arcPerSector) + randomRange(rng, -layer.sectorJitter, layer.sectorJitter); // add some jitter to angle
+            const radius = randomRange(rng, layer.radiusMin, layer.radiusMax);
+
+            // multiply x and z by constants to make spawning area ellipse like
+            let x = Math.cos(angle) * radius * 1.5; // orig 1.14
+            let z = Math.sin(angle) * radius * 0.94;
+
+            // Keep the central play area visually open.
+            if (Math.abs(x) < 95 && Math.abs(z) < 95) {
+                x *= 1.35;
+                z *= 1.35;
+            }
+
+            const width = randomRange(rng, layer.widthMin, layer.widthMax);
+            const depth = randomRange(rng, layer.depthMin, layer.depthMax);
+
+            let height = randomRange(rng, layer.heightMin, layer.heightMax);
+            // chance to make the building a lot taller
+            if (rng() < layer.tallAccentChance) {
+                height *= randomRange(rng, 1.2, 1.65);
+            }
+
+            // a setback is a smaller top section on a builder
+            const hasSetback = rng() < layer.setbackChance;
+            const setbackHeight = hasSetback ? height * randomRange(rng, 0.15, 0.32) : 0; // make setback height a percentage of height
+            const setbackScaleX = randomRange(rng, 0.58, 0.82);
+            const setbackScaleZ = randomRange(rng, 0.58, 0.82);
+            const setbackOffsetX = randomRange(rng, -width * 0.08, width * 0.08); // setback can shift a little left or right from center
+            const setbackOffsetZ = randomRange(rng, -depth * 0.08, depth * 0.08);
+
+            const hasWindows = rng() < layer.windowChance;
+            const sideDirection = rng() < 0.5 ? -1 : 1; // determine which side gets the side-window face (-1 = left side, +1 = right side)
+
+            buildings.push({
+                id: `${layer.name}-${i}`,
+                layerIndex,
+                position: [x, z],
+                size: [width, height, depth],
+                roughness: randomRange(rng, 0.84, 0.98),
+                emissiveIntensity: randomRange(rng, layer.emissiveMin, layer.emissiveMax),
+                hasSetback,
+                setbackSize: [
+                    Math.max(2.5, width * setbackScaleX),
+                    setbackHeight,
+                    Math.max(2.5, depth * setbackScaleZ),
+                ],
+                setbackOffset: [setbackOffsetX, setbackOffsetZ],
+                hasWindows,
+                hasFrontWindowFace: hasWindows && rng() < 0.95, // for +z window
+                hasSideWindowFace: hasWindows && rng() < 0.72, // for -x or +x window
+                sideDirection,
+                windowOpacity: randomRange(rng, layer.windowOpacityMin, layer.windowOpacityMax),
+                windowEmissiveIntensity: randomRange(rng, 0.35, 0.65),
+            });
+        }
+    });
+
+    return buildings;
+};
+
+const SKYLINE_BUILDINGS = generateSkylineBuildings();
 
 const SharedEnvironment = ({ debug = false, isSunset = false }) => {
     const [colors, setColors] = useState(DEFAULT_COLORS);
@@ -156,6 +301,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false }) => {
         addFolderColor(atmosphere, "background", "Background");
         addFolderColor(atmosphere, "fog", "Fog");
         const skyFolder = atmosphere.addFolder("Sky");
+        addFolderColor(skyFolder, "sunsetLight", "Sunset Light Color");
         skyFolder.add(skyParamsRef.current, "skyElevation", 0, 90)
             .name("Sky Elevation")
             .onChange(updateSkyParam("skyElevation"));
@@ -187,6 +333,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false }) => {
         addFolderColor(rooftop, "loungeChairSectionGround", "Secondary Ground");
         addFolderColor(rooftop, "door", "Door");
         addFolderColor(rooftop, "overhangSlab", "Overhang Slab")
+        addFolderColor(rooftop, "canopyLight", "Canopy Light")
 
         const furniture = gui.addFolder("Furniture");
         furniture.open();
@@ -204,6 +351,8 @@ const SharedEnvironment = ({ debug = false, isSunset = false }) => {
         addFolderColor(skyline, "skyline", "Buildings");
         addFolderColor(skyline, "skylineEmissive", "Emissive");
         addFolderColor(skyline, "ground", "Ground");
+        addFolderColor(skyline, "ocean", "Ocean");
+        addFolderColor(skyline, "oceanHighlight", "Ocean Highlight");
 
         return () => {
             safeDestroy(guiRef.current);
@@ -214,7 +363,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false }) => {
     return (
         <>
             <color attach="background" args={[colors.background]} />
-            <fog attach="fog" args={[colors.fog, 2, 300]} /> 
+            {/* <fog attach="fog" args={[colors.fog, 2, 300]} />  */}
             
             <ambientLight intensity={0.4}/>
             {/* <hemisphereLight intensity={0.3} groundColor="#2d2f2b" /> */}
@@ -223,6 +372,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false }) => {
 
             <PreethamSky
                 isDefaultSky={!isSunset}
+                lightColor={isSunset ? colors.sunsetLight : "#ffffff"}
                 distance={skyParams.skyDistance}
                 elevation={skyParams.skyElevation}
                 azimuth={skyParams.skyAzimuth}
@@ -291,6 +441,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false }) => {
                         key={`cantilever-light-${index}`}
                         position={position}
                         castShadow={false}
+                        lightColor={colors.canopyLight}
                     />
                 ))}
 
@@ -385,41 +536,119 @@ const SharedEnvironment = ({ debug = false, isSunset = false }) => {
             {/* skyline backdrop */}
             <group>
                 {SKYLINE_BUILDINGS.map((building, index) => (
-                    <mesh
-                        key={`skyline-${index}`}
-                        position={[
-                            building.position[0],
-                            BASE_Y + building.size[1] / 2,
-                            building.position[2],
-                        ]}
-                        castShadow
-                        receiveShadow
+                    <group
+                        key={`skyline-${building.id}-${index}`}
+                        position={[building.position[0], BASE_Y, building.position[1]]}
                     >
-                        <boxGeometry args={building.size} />
-                        <meshStandardMaterial
-                            color={colors.skyline}
-                            roughness={0.9}
-                            emissive={colors.skylineEmissive}
-                            emissiveIntensity={0.2}
-                        />
-                    </mesh>
+                        <mesh position={[0, building.size[1] / 2, 0]}>
+                            <boxGeometry args={building.size} />
+                            <meshStandardMaterial
+                                color={colors.skyline}
+                                roughness={building.roughness}
+                                metalness={0.06}
+                                emissive={colors.skylineEmissive}
+                                emissiveIntensity={building.emissiveIntensity}
+                            />
+                        </mesh>
+
+                        {building.hasSetback ? (
+                            <mesh
+                                position={[
+                                    building.setbackOffset[0],
+                                    building.size[1] + (building.setbackSize[1] / 2),
+                                    building.setbackOffset[1],
+                                ]}
+                            >
+                                <boxGeometry args={building.setbackSize} />
+                                <meshStandardMaterial
+                                    color={colors.skyline}
+                                    roughness={Math.min(1, building.roughness + 0.04)}
+                                    metalness={0.04}
+                                    emissive={colors.skylineEmissive}
+                                    emissiveIntensity={building.emissiveIntensity * 0.8}
+                                />
+                            </mesh>
+                        ) : null}
+
+                        {building.hasFrontWindowFace ? (
+                            <mesh
+                                position={[0, building.size[1] * 0.5, (building.size[2] / 2) + 0.06]}
+                            >
+                                <boxGeometry args={[building.size[0] * 0.84, building.size[1] * 0.86, 0.06]} />
+                                <meshStandardMaterial
+                                    color={colors.skylineEmissive}
+                                    emissive={colors.skylineEmissive}
+                                    emissiveIntensity={building.windowEmissiveIntensity}
+                                    transparent
+                                    opacity={building.windowOpacity}
+                                    roughness={0.4}
+                                    metalness={0.12}
+                                />
+                            </mesh>
+                        ) : null}
+
+                        {building.hasSideWindowFace ? (
+                            <mesh
+                                position={[
+                                    building.sideDirection * ((building.size[0] / 2) + 0.06),
+                                    building.size[1] * 0.5,
+                                    0,
+                                ]}
+                            >
+                                <boxGeometry args={[0.06, building.size[1] * 0.82, building.size[2] * 0.8]} />
+                                <meshStandardMaterial
+                                    color={colors.skylineEmissive}
+                                    emissive={colors.skylineEmissive}
+                                    emissiveIntensity={building.windowEmissiveIntensity * 0.85}
+                                    transparent
+                                    opacity={building.windowOpacity * 0.9}
+                                    roughness={0.4}
+                                    metalness={0.12}
+                                />
+                            </mesh>
+                        ) : null}
+                    </group>
                 ))}
             </group>
 
             {/* distant ground for skyline */}
             <RigidBody type="fixed" colliders={false} position={[0, BASE_Y, 0]}>
-                <CuboidCollider args={[250, 0.1, 250]} position={[0, -0.1, 0]} />
+                <CuboidCollider args={[GROUND_SIZE[0] / 2, 0.1, GROUND_SIZE[1] / 2]} position={[0, -0.1, 0]} />
                 <mesh rotation-x={-Math.PI / 2} receiveShadow>
-                    <planeGeometry args={[500, 500]} />
+                    <planeGeometry args={GROUND_SIZE} />
                     <meshStandardMaterial color={colors.ground} roughness={1} />
                 </mesh>
             </RigidBody>
+
+            {/* bay/ocean backdrop under the bridge to avoid hard horizon cutoffs */}
+            <group position={OCEAN_POSITION}>
+                <mesh rotation-x={-Math.PI / 2} receiveShadow>
+                    <planeGeometry args={OCEAN_SIZE} />
+                    <meshStandardMaterial
+                        color={colors.ocean}
+                        roughness={0.35}
+                        metalness={0.18}
+                    />
+                </mesh>
+                <mesh rotation-x={-Math.PI / 2} position={[0, OCEAN_SURFACE_OFFSET, 0]}>
+                    <planeGeometry args={OCEAN_SIZE} />
+                    <meshStandardMaterial
+                        color={colors.oceanHighlight}
+                        roughness={0.2}
+                        metalness={0.35}
+                        transparent
+                        opacity={0.22}
+                        emissive={colors.oceanHighlight}
+                        emissiveIntensity={0.05}
+                    />
+                </mesh>
+            </group>
 
             {/* GGB */}
             <primitive 
                 object={ggbModel} 
                 scale={50} 
-                position={[0, BASE_Y + 10, 270]}
+                position={[0, BASE_Y + 10, 300]}
                 rotation={[0, -Math.PI/8, 0]}
             />
 

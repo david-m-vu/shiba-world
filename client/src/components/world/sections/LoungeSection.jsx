@@ -6,6 +6,7 @@ import Planter from "../objects/Planter.jsx";
 import Couch from "../objects/Couch.jsx";
 import CoffeeTable from "../objects/CoffeeTable.jsx";
 import { Grass } from "../objects/Grass.jsx";
+import DiningSetSection from "../objects/DiningSet.jsx";
 
 const LoungeSection = ({
     position = [0, 0, 0],
@@ -93,10 +94,24 @@ const LoungeSection = ({
             </group>
 
             <CoffeeTable 
-                position={[1.5, 0, 6]} 
+                position={[1.25, 0, 5.5]} 
                 color={coffeeTableColor} 
                 rigidBodyProps={{
                     density: 6
+                }}
+            />
+
+            <DiningSetSection
+                position={[0, 0.01, 10.5]}
+                chairDistance={2.25}
+                tableProps={{
+                    topRadius: 1.5,
+                    topColor: "#f2f2f0",
+                    baseColor: "#202125",
+                }}
+                chairProps={{
+                    seatColor: "#17171a",
+                    legColor: "#101013",
                 }}
             />
         </group>

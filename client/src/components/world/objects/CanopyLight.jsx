@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 
 const CanopyLight = ({ 
     position = [0, 0, 0] ,
+    lightColor = "#fff1d1",
     castShadow = true
 }) => {
     const groupRef = useRef(null);
@@ -38,7 +39,7 @@ const CanopyLight = ({
                 ref={spotlightRef}
                 castShadow={castShadow}
                 position={[0, -0.1, 0]}
-                color="#fff1d1"
+                color={lightColor}
                 intensity={18}
                 angle={0.8}
                 penumbra={0.55}

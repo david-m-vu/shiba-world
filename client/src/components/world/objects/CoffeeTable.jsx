@@ -19,7 +19,7 @@ const CoffeeTable = ({
     roughness = 0.4,
     metalness = 0.1,
     anchor = "center",
-    rigidBodyProps = {},
+    rigidBodyProps = defaultRigidBodyProps,
     ...meshProps
 }) => {
     const anchorShift = anchorOffset(size, anchor);

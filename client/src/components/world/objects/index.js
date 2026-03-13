@@ -7,3 +7,5 @@ export { default as Planter } from "./Planter.jsx";
 export { default as Slab } from "./Slab.jsx";
 export { default as Soccer } from "./Soccer.jsx";
 export { default as CanopyLight } from "./CanopyLight.jsx";
+export { default as Chair } from "./Chair.jsx";
+export { default as Table } from "./Table.jsx";

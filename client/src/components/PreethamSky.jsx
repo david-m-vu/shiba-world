@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Sky } from "@react-three/drei";
 import { MathUtils, Vector3 } from "three";
 
-const DEFAULT_PARAMS = {
+const DEFAULT_PARAMS = { // for a bright day
     distance: 450000,
     sunPosition: [-18, 38, -20],
     turbidity: 7,
@@ -11,8 +11,9 @@ const DEFAULT_PARAMS = {
     mieDirectionalG: 0.85
 }
 
-const ExampleSky = ({
+const PreethamSky = ({
     isDefaultSky = false,
+    lightColor = "#ffffff",
     distance = 450000,
     turbidity = 10,
     rayleigh = 3,
@@ -44,6 +45,7 @@ const ExampleSky = ({
                 shadow-camera-bottom={-50}
                 shadow-camera-near={1}
                 shadow-camera-far={120}
+                color={lightColor}
             />
             {isDefaultSky ? 
                 <Sky 
@@ -64,4 +66,4 @@ const ExampleSky = ({
     );
 };
 
-export default ExampleSky;
+export default PreethamSky;
