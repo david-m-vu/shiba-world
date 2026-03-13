@@ -2,9 +2,8 @@
  * Shared 3D scene that is used with LandingPresentationLayer and MultiplayerLayer
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGLTF } from "@react-three/drei";
-import { MathUtils, Vector3 } from "three";
 import { GUI } from "dat.gui";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import PreethamSky from "../components/PreethamSky.jsx";
@@ -18,6 +17,7 @@ import {
     Planter,
     Slab,
     Grass,
+    CanopyLight
 } from "../components/world/objects/index.js";
 
 const GGB_URL = new URL("../assets/golden_gate_bridge/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
@@ -37,7 +37,9 @@ const DEFAULT_COLORS = {
     skylineEmissive: "#1a1f2a",
     ground: "#6d747d",
     plant: "#2c5a3a",
-    loungeChairSectionGround: "#70a3ad"
+    loungeChairSectionGround: "#70a3ad",
+    frame: "#db9547",
+    overhangSlab: "#314563"
 };
 
 const SKY_PARAMS = {
@@ -56,6 +58,25 @@ const ROOFTOP_SIZE = [60, 30, 30];
 const ROOFTOP_Y = 0;
 
 const BULKHEAD_SIZE = [11, ROOFTOP_SIZE[1] + 8, 8]
+
+const MIDDLE_EXTENSION_POSITION = [-15, BASE_Y, -(ROOFTOP_SIZE[2] / 2)];
+const MIDDLE_EXTENSION_SIZE = [30, ROOFTOP_SIZE[1] + 6, 8];
+const MIDDLE_EXTENSION_TOP_Y = MIDDLE_EXTENSION_POSITION[1] + MIDDLE_EXTENSION_SIZE[1];
+
+const CANTILEVER_OVERHANG_SIZE = [30, 0.2, 10];
+const CANTILEVER_OVERHANG_POSITION = [
+    MIDDLE_EXTENSION_POSITION[0],
+    MIDDLE_EXTENSION_TOP_Y - 0.2,
+    MIDDLE_EXTENSION_POSITION[2],
+];
+const CANTILEVER_LIGHT_COUNT = 3;
+const CANTILEVER_LIGHT_Y = CANTILEVER_OVERHANG_POSITION[1] + 0.08;
+const CANTILEVER_LIGHT_Z = CANTILEVER_OVERHANG_POSITION[2] + (CANTILEVER_OVERHANG_SIZE[2] / 2);
+const CANTILEVER_LIGHT_POSITIONS = Array.from({ length: CANTILEVER_LIGHT_COUNT }, (_, index) => [
+    MIDDLE_EXTENSION_POSITION[0] + (MIDDLE_EXTENSION_SIZE[0] / (CANTILEVER_LIGHT_COUNT + 1)) * (index + 1),
+    CANTILEVER_LIGHT_Y,
+    CANTILEVER_LIGHT_Z,
+]);
 
 const SKYLINE_BUILDINGS = [
     { position: [-140, 10, -120], size: [18, 20, 12] },
@@ -79,7 +100,7 @@ const SKYLINE_BUILDINGS = [
 
 const RAILING_DEPTH = 0.25;
 
-const SharedEnvironment = ({ debug = false, sunset = false }) => {
+const SharedEnvironment = ({ debug = false, isSunset = false }) => {
     const [colors, setColors] = useState(DEFAULT_COLORS);
     const [skyParams, setSkyParams] = useState(SKY_PARAMS);
     const skyParamsRef = useRef({ ...SKY_PARAMS }); // need this because dat.gui needs a stable object reference to mutate, sine useState setState creates new objects
@@ -88,14 +109,6 @@ const SharedEnvironment = ({ debug = false, sunset = false }) => {
     const { scene: ggbModel } = useGLTF(GGB_URL);
 
     const showGui = debug || import.meta.env.DEV;
-
-    const sunPosition = useMemo(() => {
-        const phi = MathUtils.degToRad(90 - skyParams.skyElevation);
-        const theta = MathUtils.degToRad(skyParams.skyAzimuth);
-        const sun = new Vector3();
-        sun.setFromSphericalCoords(100, phi, theta);
-        return sun.toArray();
-    }, [skyParams.skyElevation, skyParams.skyAzimuth]);
 
     useEffect(() => {
         // walk every child in the gltf scene graph, and for each mesh, make it so it casts shadows and receives shadows
@@ -124,7 +137,7 @@ const SharedEnvironment = ({ debug = false, sunset = false }) => {
 
         const gui = new GUI({ width: 300, name: "World Colors" });
         guiRef.current = gui;
-        const params = { ...DEFAULT_COLORS, ...colors };
+        const params = { ...DEFAULT_COLORS };
 
         const addFolderColor = (folder, key, label) => {
             // addColor renders a color picker
@@ -173,12 +186,14 @@ const SharedEnvironment = ({ debug = false, sunset = false }) => {
         addFolderColor(rooftop, "rooftopStairBulkhead", "Stair Bulkhead");
         addFolderColor(rooftop, "loungeChairSectionGround", "Secondary Ground");
         addFolderColor(rooftop, "door", "Door");
+        addFolderColor(rooftop, "overhangSlab", "Overhang Slab")
 
         const furniture = gui.addFolder("Furniture");
         furniture.open();
         addFolderColor(furniture, "couchSeat", "Couch Seat");
         addFolderColor(furniture, "couchBack", "Couch Back");
         addFolderColor(furniture, "coffeeTable", "Coffee Table");
+        addFolderColor(furniture, "frame", "Frame");
 
         const plants = gui.addFolder("Plants");
         plants.open();
@@ -207,7 +222,7 @@ const SharedEnvironment = ({ debug = false, sunset = false }) => {
             <ambientLight intensity={0.2} />
 
             <PreethamSky
-                isDefaultSky={!sunset}
+                isDefaultSky={!isSunset}
                 distance={skyParams.skyDistance}
                 elevation={skyParams.skyElevation}
                 azimuth={skyParams.skyAzimuth}
@@ -253,7 +268,33 @@ const SharedEnvironment = ({ debug = false, sunset = false }) => {
                     surfaceColor={colors.rooftopSurface}
                 />
 
-                {/* entrance slab */}
+                {/* middle extension slab */}
+                <Slab 
+                    position={MIDDLE_EXTENSION_POSITION}
+                    size={MIDDLE_EXTENSION_SIZE}
+                    anchor="minXmaxZ"
+                    color={colors.rooftopSlab}
+                />
+
+                {/* cantilevered overhang for the middle extension */}
+                <Slab
+                    position={CANTILEVER_OVERHANG_POSITION}
+                    size={CANTILEVER_OVERHANG_SIZE}
+                    anchor="minXminZ"
+                    color={colors.overhangSlab}
+                    roughness={0.85}
+                    surfaceColor={colors.rooftopSurface}
+                />
+
+                {CANTILEVER_LIGHT_POSITIONS.map((position, index) => (
+                    <CanopyLight
+                        key={`cantilever-light-${index}`}
+                        position={position}
+                        castShadow={false}
+                    />
+                ))}
+
+                {/* entrance / play area slab */}
                 <Slab 
                     position={[ROOFTOP_SIZE[0] / 2, BASE_Y, -(ROOFTOP_SIZE[2] / 2)]}
                     size={[15, ROOFTOP_SIZE[1], 8]}
@@ -261,6 +302,7 @@ const SharedEnvironment = ({ debug = false, sunset = false }) => {
                     hasSeparateSurface
                     surfaceColor={colors.rooftopSurface}
                 />
+
             </group>
             
             
@@ -289,13 +331,13 @@ const SharedEnvironment = ({ debug = false, sunset = false }) => {
             {/* left and right railings */}
             <PerimeterRailing 
                 position={[(ROOFTOP_SIZE[0] / 2), ROOFTOP_Y, ROOFTOP_SIZE[2] / 2]} 
-                args={[RAILING_DEPTH, 1.2, ROOFTOP_SIZE[2] + BULKHEAD_SIZE[2]]} 
+                args={[RAILING_DEPTH, 1.5, ROOFTOP_SIZE[2] + BULKHEAD_SIZE[2]]} 
                 color={colors.railing} 
                 anchor="maxXmaxZ"
             />
             <PerimeterRailing 
                 position={[-((ROOFTOP_SIZE[0] / 2) - (RAILING_DEPTH / 2)), ROOFTOP_Y, 0]} 
-                args={[RAILING_DEPTH, 1.2, ROOFTOP_SIZE[2]]} 
+                args={[RAILING_DEPTH, 1.5, ROOFTOP_SIZE[2]]} 
                 color={colors.railing} 
             />
 
@@ -309,13 +351,6 @@ const SharedEnvironment = ({ debug = false, sunset = false }) => {
             />
 
             {/* middle */}
-            <Slab 
-                position={[-15, BASE_Y, -ROOFTOP_SIZE[2] / 2]}
-                size={[30, ROOFTOP_SIZE[1] + 5, 8]}
-                anchor="minXmaxZ"
-                color={colors.rooftopSlab}
-            />
-
             <Planter 
                 position={[0, 0, -(ROOFTOP_SIZE[2] / 2 - 1.5)]}
                 size={[30,1.5,3]}
@@ -344,6 +379,7 @@ const SharedEnvironment = ({ debug = false, sunset = false }) => {
                 rotation={[0,Math.PI,0]}
                 tvFrameSize={[3.2, 1.7, 0.12]}
                 tvScreenSize={[3.0, 1.6, 0.06]}
+                frameColor={colors.frame}
             />
 
             {/* skyline backdrop */}

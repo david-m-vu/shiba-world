@@ -6,3 +6,4 @@ export { default as PerimeterRailing } from "./PerimeterRailing.jsx";
 export { default as Planter } from "./Planter.jsx";
 export { default as Slab } from "./Slab.jsx";
 export { default as Soccer } from "./Soccer.jsx";
+export { default as CanopyLight } from "./CanopyLight.jsx";

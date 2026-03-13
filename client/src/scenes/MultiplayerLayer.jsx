@@ -8,12 +8,24 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useRapier } from "@react-three/rapier";
 import { Quaternion, Vector3 } from "three";
+
 import Avatar from "../components/Avatar.jsx";
 
+import { useGameStore } from "../store/useGameStore.js";
+
 const LOCAL_MOVE_SPEED = 12; // orig 8
-const HIDE_DISTANCE = 0.6;
 const TURN_SPEED = 8;
 const JUMP_IMPULSE = 6.5;
+const HIDE_DISTANCE = 0.6;
+
+const CAMERA_TARGET_Y_OFFSET = 0.8;
+const CAMERA_MIN_DISTANCE = 0.3;
+const CAMERA_MAX_DISTANCE = 100;
+const CAMERA_WHEEL_ZOOM_SPEED = 0.0002; // 0.00042 is equal step distance
+const POINTER_LOOK_SENSITIVITY = 0.005;
+const POINTER_LOOK_MIN_PITCH = -Math.PI / 3;
+const POINTER_LOOK_MAX_PITCH = Math.PI / 3;
+
 const GROUND_RAY_OFFSET = 0.05;
 const GROUND_RAY_LENGTH = 0.25;
 const FOOT_RAY_RADIUS = 0.35;
@@ -53,9 +65,14 @@ const lerpAngle = (current, target, t) => {
     return current + delta * t;
 };
 
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+
 const MultiplayerLayer = () => {
-    const { camera } = useThree();
+    const { camera, gl } = useThree(); // gl is the underlying threejs WebGLRenderer
     const { rapier, world } = useRapier();
+
+    const cameraLockMode = useGameStore((state) => state.cameraLockMode);
+
     const controlsRef = useRef(null);
     const localRigidBodyRef = useRef(null);
     const localVisualRef = useRef(null);
@@ -64,8 +81,10 @@ const MultiplayerLayer = () => {
     const targetDelta = useMemo(() => new Vector3(), []);
     const previousTarget = useMemo(() => new Vector3(...localPlayer.position), []);
 
-    const camForward = useMemo(() => new Vector3(), []);
+    const camForward = useMemo(() => new Vector3(), []); // movement facing direction, flattened y = 0 and normalized, used for WASD basis
     const camRight = useMemo(() => new Vector3(), []);
+    const cameraTarget = useMemo(() => new Vector3(), []);
+    const cameraForward = useMemo(() => new Vector3(), []); // full 3D camera direction, keeping vertical component, used for camera placement, not normalized
     const moveDir = useMemo(() => new Vector3(), []);
     const up = useMemo(() => new Vector3(0, 1, 0), []);
     const tmpQuat = useMemo(() => new Quaternion(), []);
@@ -83,6 +102,11 @@ const MultiplayerLayer = () => {
         d: false,
     });
 
+    // for cameraLockMode
+    const cameraYaw = useRef(0);
+    const cameraPitch = useRef(0);
+    const cameraDistance = useRef(6);
+
     // detect which keys are preseed
     useEffect(() => {
         const handleKeyDown = (event) => {
@@ -90,13 +114,31 @@ const MultiplayerLayer = () => {
                 jumpQueued.current = true;
                 return;
             }
+            if (event.key === "Shift") {
+                // event.repeat tells you if the event came from key auto-repeat
+                // false only for the first keydown when key is initially pressed
+                // true for subsequent keydown events while key is still held
+                if (!event.repeat) {
+                    const canvas = gl.domElement;
+                    if (document.pointerLockElement === canvas) {
+                        document.exitPointerLock();
+                    } else {
+                        canvas.requestPointerLock();
+                    }
+                }
+                return;
+            }
             const key = event.key.toLowerCase();
             if (key in keys.current) {
                 keys.current[key] = true;
             }
         };
+
         const handleKeyUp = (event) => {
             if (event.code === "Space") {
+                return;
+            }
+            if (event.key === "Shift") {
                 return;
             }
             const key = event.key.toLowerCase();
@@ -111,7 +153,48 @@ const MultiplayerLayer = () => {
             window.removeEventListener("keydown", handleKeyDown);
             window.removeEventListener("keyup", handleKeyUp);
         };
-    }, []);
+    }, [gl]);
+
+    // read relative mouse movement while pointer lock is active
+    useEffect(() => {
+        const handleMouseMove = (event) => {
+            if (!cameraLockMode) {
+                return;
+            }
+            // subtract because screen coords start from top left
+            cameraYaw.current -= event.movementX * POINTER_LOOK_SENSITIVITY;
+            cameraPitch.current -= event.movementY * POINTER_LOOK_SENSITIVITY;
+            cameraPitch.current = clamp(cameraPitch.current, POINTER_LOOK_MIN_PITCH, POINTER_LOOK_MAX_PITCH);
+        };
+
+        window.addEventListener("mousemove", handleMouseMove);
+        return () => {
+            window.removeEventListener("mousemove", handleMouseMove);
+        };
+    }, [cameraLockMode]);
+
+    // allow zoom in/out with mouse wheel while pointer lock mode is active
+    useEffect(() => {
+        const canvas = gl.domElement;
+
+        const handleWheel = (event) => {
+            if (!cameraLockMode) {
+                return;
+            }
+            event.preventDefault();
+            const zoomFactor = Math.exp(event.deltaY * CAMERA_WHEEL_ZOOM_SPEED);
+            cameraDistance.current = clamp(
+                cameraDistance.current * zoomFactor,
+                CAMERA_MIN_DISTANCE,
+                CAMERA_MAX_DISTANCE
+            );
+        };
+
+        canvas.addEventListener("wheel", handleWheel, { passive: false });
+        return () => {
+            canvas.removeEventListener("wheel", handleWheel);
+        };
+    }, [cameraLockMode, gl]);
 
     useFrame((_state, delta) => {
         const rb = localRigidBodyRef.current;
@@ -137,16 +220,34 @@ const MultiplayerLayer = () => {
         const inputX = (keys.current.d ? 1 : 0) - (keys.current.a ? 1 : 0);
         const inputZ = (keys.current.w ? 1 : 0) - (keys.current.s ? 1 : 0);
 
+        // handle calculation of camForward for movement direction
+        if (cameraLockMode) {
+            // horizontal scale factor - when you look up/down more, horizontal strength should shrink
+            const cosPitch = Math.cos(cameraPitch.current);
+            // convert angles into 3D cartesion vector (direction)
+            // at the horizon, cos(0) = 1 --> full strength in xz plane
+            camForward.set(
+                Math.sin(cameraYaw.current) * cosPitch,
+                Math.sin(cameraPitch.current),
+                Math.cos(cameraYaw.current) * cosPitch
+            );
+        } else {
+            camera.getWorldDirection(camForward);
+        }
+
+        camForward.y = 0; // project onto xz plane
+
+        if (camForward.lengthSq() > 0.0001) {
+            camForward.normalize();
+        } else {
+            camForward.set(0, 0, -1);
+        }
+        camRight.copy(camForward).cross(up).normalize(); // if camForward is in the +z, camRight is in the -x
+
         moveDir.set(0, 0, 0);
 
         // calculate moveDir direction vector based on user input
         if (inputX !== 0 || inputZ !== 0) {
-            camera.getWorldDirection(camForward);
-            camForward.y = 0; // project onto xz plane
-            camForward.normalize();
-
-            camRight.copy(camForward).cross(up).normalize(); // if camForward is in the +z, camRight is in the -x
-
             moveDir
                 .addScaledVector(camForward, inputZ)
                 .addScaledVector(camRight, inputX);
@@ -179,21 +280,64 @@ const MultiplayerLayer = () => {
             jumpQueued.current = false;
         }
 
-        // update camera position
-        if (controlsRef.current) {
+
+        /*
+         * update camera position with cameraForward
+         */
+        cameraTarget.copy(localPosition);
+        cameraTarget.y += CAMERA_TARGET_Y_OFFSET;
+
+        // if cameraLockMode, handle camera position
+        if (controlsRef.current && cameraLockMode) {
+            const cosPitch = Math.cos(cameraPitch.current);
+            cameraForward.set( // unit vector at this point
+                Math.sin(cameraYaw.current) * cosPitch,
+                Math.sin(cameraPitch.current),
+                Math.cos(cameraYaw.current) * cosPitch
+            );
+
+            // camera.position = target - cameraForward * distance
+            camera.position.copy(cameraTarget).addScaledVector(cameraForward, -cameraDistance.current);
+            camera.lookAt(cameraTarget);
+            controlsRef.current.target.copy(cameraTarget);
+            previousTarget.copy(localPosition);
+
+        } else if (controlsRef.current) { // if no cameraLockMode
             // subtract new position from previous position --> this becomes the exact distance our camera also has to move
             targetDelta.subVectors(localPosition, previousTarget);
             camera.position.add(targetDelta);
-
-            // center camera on avatar position
-            controlsRef.current.target.copy(localPosition);
+            controlsRef.current.target.copy(cameraTarget);
             controlsRef.current.update();
+
+            // compute the vector pointing from camera to target
+            // to get a vector pointing from a (camera) to b (cameraTarget)
+            cameraForward.subVectors(cameraTarget, camera.position);
+            const distance = cameraForward.length();
+            
+            if (distance > 0.0001) {
+                cameraDistance.current = clamp(distance, CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE);
+                cameraForward.multiplyScalar(1 / distance); // normalize
+                cameraYaw.current = Math.atan2(cameraForward.x, cameraForward.z);
+                // clamp to prevent invalid values since asin is only defined for [-1, 1]
+                cameraPitch.current = Math.asin(clamp(cameraForward.y, -1, 1));
+            }
 
             previousTarget.copy(localPosition);
         }
 
         // handle avatar rotation
-        if (moveDir.lengthSq() > 0.0001) {
+        if (cameraLockMode) { // if cameraLockMode, should have no lerp
+            currentYaw.current = Math.atan2(camForward.x, camForward.z);
+            tmpQuat.setFromAxisAngle(up, currentYaw.current); // rotate about the y axis
+            rb.setRotation(
+                { x: tmpQuat.x, y: tmpQuat.y, z: tmpQuat.z, w: tmpQuat.w },
+                true
+            );
+
+        } else if (moveDir.lengthSq() > 0.0001) {
+            // const targetYaw = cameraLockMode
+            //     ? Math.atan2(camForward.x, camForward.z)
+            //     : Math.atan2(moveDir.x, moveDir.z);
             const targetYaw = Math.atan2(moveDir.x, moveDir.z); // find out what angle we're looking at relative to the +z
             currentYaw.current = lerpAngle(
                 currentYaw.current,
@@ -217,10 +361,11 @@ const MultiplayerLayer = () => {
         <>
             <OrbitControls
                 ref={controlsRef}
+                enabled={!cameraLockMode}
                 enableDamping
                 dampingFactor={0.08}
-                minDistance={0.3}
-                maxDistance={100} // orig 25
+                minDistance={CAMERA_MIN_DISTANCE}
+                maxDistance={CAMERA_MAX_DISTANCE} // orig 25
                 enablePan={false}
             />
 

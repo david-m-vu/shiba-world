@@ -12,7 +12,7 @@ const WorldShell = () => {
     return (
         <>
             <MultiplayerLayer />
-            <SharedEnvironment debug={isDevMode} sunset />
+            <SharedEnvironment debug={isDevMode} isSunset />
         </>
     )
 }
