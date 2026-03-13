@@ -6,8 +6,9 @@ import { useEffect, useRef, useState } from "react";
 import { useGLTF } from "@react-three/drei";
 import { GUI } from "dat.gui";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
-import PreethamSky from "../components/PreethamSky.jsx";
 
+import PreethamSky from "../components/PreethamSky.jsx";
+import OceanBackdrop from "../components/OceanBackdrop.jsx";
 import { LoungeChairSection, LoungeSection, CabanaSection, PlayAreaSection, DiningSetSection } from "../components/world/sections/index.js";
 import {
     CoffeeTable,
@@ -20,11 +21,13 @@ import {
     CanopyLight
 } from "../components/world/objects/index.js";
 
+import { createDeterministicRandom, randomRange } from "../lib/util.js";
+
 const GGB_URL = new URL("../assets/golden_gate_bridge/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
 
 const DEFAULT_COLORS = {
     background: "#9fc4ff",
-    fog: "#a97dbc",
+    fog: "#b27389",
     rooftopSurface: "#DBDAD6",
     rooftopSlab: "#c6e0c7",
     rooftopStairBulkhead: "#db9547",
@@ -88,24 +91,6 @@ const OCEAN_POSITION = [0, BASE_Y - 0.25, 0];
 const OCEAN_SIZE = [1200, 1320];
 const OCEAN_SURFACE_OFFSET = 0.02;
 
-// pseudo rng counter-based to produce a predictable sequence of numbers based on an inital seed (generates [0, 1))
-const createDeterministicRandom = (seed) => {
-    // unsigned right shift to force value into a 32 bit unsigned integer
-    let state = seed >>> 0;
-    // return a closure that remembers this state variable
-    return () => {
-        state += 0x6D2B79F5; // move state forward by a large constant to ensure generator doesn't repeat itself
-        let t = state;
-        // scramble bits
-        t = Math.imul(t ^ (t >>> 15), t | 1);  // mix top half with bottom half, then multiply by an odd number so that no informatio nis "lost" due to zeros shifting in
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296; // 4294967296 is 2^32. convert 32 integer into a decimal between 0 and 1
-    };
-};
-
-// generates a random number between min and max
-const randomRange = (rng, min, max) => min + (max - min) * rng();
-
 const SKYLINE_LAYERS = [
     {
         name: "near",
@@ -151,7 +136,7 @@ const SKYLINE_LAYERS = [
     },
     {
         name: "far",
-        count: 56,
+        count: 60,
         radiusMin: 220,
         radiusMax: 260,
         widthMin: 8,
@@ -245,7 +230,7 @@ const generateSkylineBuildings = (seed = 20260313) => {
 
 const SKYLINE_BUILDINGS = generateSkylineBuildings();
 
-const SharedEnvironment = ({ debug = false, isSunset = false }) => {
+const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = false }) => {
     const [colors, setColors] = useState(DEFAULT_COLORS);
     const [skyParams, setSkyParams] = useState(SKY_PARAMS);
     const skyParamsRef = useRef({ ...SKY_PARAMS }); // need this because dat.gui needs a stable object reference to mutate, sine useState setState creates new objects
@@ -363,7 +348,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false }) => {
     return (
         <>
             <color attach="background" args={[colors.background]} />
-            {/* <fog attach="fog" args={[colors.fog, 2, 300]} />  */}
+            <fog attach="fog" args={[colors.fog, 2, 400]} /> 
             
             <ambientLight intensity={0.4}/>
             {/* <hemisphereLight intensity={0.3} groundColor="#2d2f2b" /> */}
@@ -621,28 +606,39 @@ const SharedEnvironment = ({ debug = false, isSunset = false }) => {
             </RigidBody>
 
             {/* bay/ocean backdrop under the bridge to avoid hard horizon cutoffs */}
-            <group position={OCEAN_POSITION}>
-                <mesh rotation-x={-Math.PI / 2} receiveShadow>
-                    <planeGeometry args={OCEAN_SIZE} />
-                    <meshStandardMaterial
-                        color={colors.ocean}
-                        roughness={0.35}
-                        metalness={0.18}
-                    />
-                </mesh>
-                <mesh rotation-x={-Math.PI / 2} position={[0, OCEAN_SURFACE_OFFSET, 0]}>
-                    <planeGeometry args={OCEAN_SIZE} />
-                    <meshStandardMaterial
-                        color={colors.oceanHighlight}
-                        roughness={0.2}
-                        metalness={0.35}
-                        transparent
-                        opacity={0.22}
-                        emissive={colors.oceanHighlight}
-                        emissiveIntensity={0.05}
-                    />
-                </mesh>
-            </group>
+            {useOceanShaders ?
+                <OceanBackdrop
+                    position={OCEAN_POSITION}
+                    size={OCEAN_SIZE}
+                    color={colors.ocean}
+                    highlightColor={colors.oceanHighlight}
+                    oceanSurfaceOffset={OCEAN_SURFACE_OFFSET}
+                />
+                :
+                <group position={OCEAN_POSITION}>
+                    <mesh rotation-x={-Math.PI / 2} receiveShadow>
+                        <planeGeometry args={OCEAN_SIZE} />
+                        <meshStandardMaterial
+                            color={colors.ocean}
+                            roughness={0.35}
+                            metalness={0.18}
+                        />
+                    </mesh>
+                    <mesh rotation-x={-Math.PI / 2} position={[0, OCEAN_SURFACE_OFFSET, 0]}>
+                        <planeGeometry args={OCEAN_SIZE} />
+                        <meshStandardMaterial
+                            color={colors.oceanHighlight}
+                            roughness={0.2}
+                            metalness={0.35}
+                            transparent
+                            opacity={0.22}
+                            emissive={colors.oceanHighlight}
+                            emissiveIntensity={0.05}
+                        />
+                    </mesh>
+                </group>
+            }
+            
 
             {/* GGB */}
             <primitive 

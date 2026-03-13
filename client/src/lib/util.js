@@ -16,3 +16,21 @@ export const anchorOffset = (size, anchor) => {
             return [0, 0, 0];
     }
 };
+
+// pseudo rng counter-based to produce a predictable sequence of numbers based on an inital seed (generates [0, 1))
+export const createDeterministicRandom = (seed) => {
+    // unsigned right shift to force value into a 32 bit unsigned integer
+    let state = seed >>> 0;
+    // return a closure that remembers this state variable
+    return () => {
+        state += 0x6D2B79F5; // move state forward by a large constant to ensure generator doesn't repeat itself
+        let t = state;
+        // scramble bits
+        t = Math.imul(t ^ (t >>> 15), t | 1);  // mix top half with bottom half, then multiply by an odd number so that no informatio nis "lost" due to zeros shifting in
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296; // 4294967296 is 2^32. convert 32 integer into a decimal between 0 and 1
+    };
+};
+
+// generates a random number between min and max
+export const randomRange = (rng, min, max) => min + (max - min) * rng();
