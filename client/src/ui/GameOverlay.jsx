@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Stats } from "@react-three/drei";
 
 import Crosshair from "../components/ui/Crosshair.jsx";
 import { useGameStore } from "../store/useGameStore.js";
@@ -20,118 +21,172 @@ const TOGGLE_BUTTON_CLASS =
     "cursor-pointer transition-transform duration-150 ease-out hover:scale-[1.02] active:scale-100 hover:opacity-95 active:opacity-90";
 
 const GameOverlay = () => {
-    const [isHelpEnabled, setIsHelpEnabled] = useState(false);
+    const [isHelpEnabled, setIsHelpEnabled] = useState(true);
     const [isSettingsEnabled, setIsSettingsEnabled] = useState(false);
 
     const [isVideoScreenEnabled, setIsVideoScreenEnabled] = useState(true);
-    const [isInfiniteJumpEnabled, setIsInfiniteJumpEnabled] = useState(false);
-    const [isDebugModeEnabled, setIsDebugModeEnabled] = useState(false);
+    const statsParentRef = useRef(null);
  
     const cameraLockMode = useGameStore((state) => state.cameraLockMode);
     const sunsetMode = useGameStore((state) => state.sunsetMode);
     const voiceEnabled = useGameStore((state) => state.voiceEnabled);
     const soundEnabled = useGameStore((state) => state.soundEnabled);
     const shadowsEnabled = useGameStore((state) => state.shadowsEnabled);
+    const infiniteJumpEnabled = useGameStore((state) => state.infiniteJumpEnabled);
+    const debugModeEnabled = useGameStore((state) => state.debugModeEnabled);
 
     const toggleSunsetMode = useGameStore((state) => state.toggleSunsetMode);
     const toggleVoiceEnabled = useGameStore((state) => state.toggleVoiceEnabled);
     const toggleSoundEnabled = useGameStore((state) => state.toggleSoundEnabled);
     const toggleShadowsEnabled = useGameStore((state) => state.toggleShadowsEnabled);
+    const toggleInfiniteJumpEnabled = useGameStore((state) => state.toggleInfiniteJumpEnabled);
+    const toggleDebugModeEnabled = useGameStore((state) => state.toggleDebugModeEnabled);
+    const requestResetCharacter = useGameStore((state) => state.requestResetCharacter);
     const leaveRoom = useGameStore((state) => state.leaveRoom);
 
+    // Show help dropdown on world join, then auto-hide
+    useEffect(() => {
+        const autoHideHelpTimeoutId = window.setTimeout(() => {
+            setIsHelpEnabled(false);
+        }, 8000);
+
+        // only for the case where the timer hasn't fired (before 8s). After 8s, clearTimeout does nothing
+        return () => {
+            window.clearTimeout(autoHideHelpTimeoutId);
+        };
+    }, []);
+
+    const handleResetCharacterClick = (event) => {
+        requestResetCharacter();
+        // event.target is the deepest element that was actually clicked (could be a child inside the button)
+        // event.currentTarget is the element that the handler is attached to, which is the button, which we want to blur
+        event.currentTarget.blur();
+    };
+
     return (
-        <div className="pointer-events-none absolute top-0 left-0 right-0 z-50 m-2 flex flex-row justify-between">
-            {/* Toggles */}
-            <div className="pointer-events-auto inline-flex flex-row gap-2.5 px-3.5 py-2.5 bg-[rgba(85,85,85,0.8)] rounded-4xl relative">
-                <button
-                    type="button"
-                    aria-label="Toggle help"
-                    aria-pressed={isHelpEnabled}
-                    onClick={() => setIsHelpEnabled((prev) => !prev)}
-                    className={TOGGLE_BUTTON_CLASS}
-                >
-                    <HelpIcon className={`w-10 h-auto ${isHelpEnabled ? "text-primary" : "text-white"}`} />
-                </button>
-                
-                <button
-                    type="button"
-                    aria-label="Toggle sunset mode"
-                    aria-pressed={sunsetMode}
-                    onClick={toggleSunsetMode}
-                    className={TOGGLE_BUTTON_CLASS}
-                >
-                    {sunsetMode ? (
-                        <img
-                            src={SunsetIcon}
-                            alt="Sunset mode enabled"
-                            className="w-10 h-auto"
-                        />
-                    ) : (
-                        <SunnyIcon className="w-10 h-auto text-white" />
-                    )}
-                </button>
+        <div className="absolute top-0 left-0 right-0 z-50 m-2 flex flex-row justify-between">
+            {/* Left side controls and fps panel anchor */}
+            <div className="inline-flex items-start gap-2.5">
+                {/* Toggles */}
+                <div className="pointer-events-auto inline-flex flex-row gap-2.5 px-3.5 py-2.5 bg-[rgba(85,85,85,0.8)] rounded-4xl relative">
+                    <button
+                        type="button"
+                        aria-label="Toggle help"
+                        aria-pressed={isHelpEnabled}
+                        onClick={(e) => {
+                            setIsHelpEnabled((prev) => !prev)
+                            e.currentTarget.blur()
+                        }}
+                        className={TOGGLE_BUTTON_CLASS}
+                    >
+                        <HelpIcon className={`w-10 h-auto ${isHelpEnabled ? "text-primary" : "text-white"}`} />
+                    </button>
+                    
+                    <button
+                        type="button"
+                        aria-label="Toggle sunset mode"
+                        aria-pressed={sunsetMode}
+                        onClick={(e) => {
+                            toggleSunsetMode()
+                            e.currentTarget.blur()
+                        }}
+                        className={TOGGLE_BUTTON_CLASS}
+                    >
+                        {sunsetMode ? (
+                            <img
+                                src={SunsetIcon}
+                                alt="Sunset mode enabled"
+                                className="w-10 h-auto"
+                            />
+                        ) : (
+                            <SunnyIcon className="w-10 h-auto text-white" />
+                        )}
+                    </button>
 
-                <button
-                    type="button"
-                    aria-label="Toggle microphone"
-                    aria-pressed={voiceEnabled}
-                    onClick={toggleVoiceEnabled}
-                    className={TOGGLE_BUTTON_CLASS}
-                >
-                    {voiceEnabled ? (
-                        <MicOnIcon className="w-10 h-auto text-white" />
-                    ) : (
-                        <MicOffIcon className="w-10 h-auto text-white" />
-                    )}
-                </button>
-                
-                <button
-                    type="button"
-                    aria-label="Toggle sound"
-                    aria-pressed={soundEnabled}
-                    onClick={toggleSoundEnabled}
-                    className={TOGGLE_BUTTON_CLASS}
-                >
-                    {soundEnabled ? (
-                        <SoundOnIcon className="w-10 h-auto text-white" />
-                    ) : (
-                        <SoundOffIcon className="w-10 h-auto text-white" />
-                    )}
-                </button>
- 
-                {/* Help dropdown */}
+                    <button
+                        type="button"
+                        aria-label="Toggle microphone"
+                        aria-pressed={voiceEnabled}
+                        onClick={(e) => {
+                            toggleVoiceEnabled()
+                            e.currentTarget.blur()
+                        }}
+                        className={TOGGLE_BUTTON_CLASS}
+                    >
+                        {voiceEnabled ? (
+                            <MicOnIcon className="w-10 h-auto text-white" />
+                        ) : (
+                            <MicOffIcon className="w-10 h-auto text-white" />
+                        )}
+                    </button>
+                    
+                    <button
+                        type="button"
+                        aria-label="Toggle sound"
+                        aria-pressed={soundEnabled}
+                        onClick={(e) => {
+                            toggleSoundEnabled();
+                            e.currentTarget.blur()
+                        }}
+                        className={TOGGLE_BUTTON_CLASS}
+                    >
+                        {soundEnabled ? (
+                            <SoundOnIcon className="w-10 h-auto text-white" />
+                        ) : (
+                            <SoundOffIcon className="w-10 h-auto text-white" />
+                        )}
+                    </button>
+    
+                    {/* Help dropdown */}
+                    <div
+                        aria-hidden={!isHelpEnabled}
+                        className={`flex flex-col absolute px-5 py-4 left-0 gap-1.5 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all duration-200 ease-out 
+                            ${isHelpEnabled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"}`}
+                    >
+                        <h1 className="text-[1rem] text-center">Controls</h1>
+                        <hr />
+                        <div className="flex flex-row justify-between gap-4">
+                            <p className="whitespace-nowrap">move</p>
+                            <p className="text-primary whitespace-nowrap" >WASD</p>
+                        </div>
+                        <div className="flex flex-row justify-between gap-4">
+                            <p className="whitespace-nowrap">jump</p>
+                            <p className="text-primary whitespace-nowrap">SPACE</p>
+                        </div>
+                        <div className="flex flex-row justify-between gap-4">
+                            <p className="whitespace-nowrap">orbit</p>
+                            <p className="text-primary whitespace-nowrap">left mouse</p>
+                        </div>
+                        <div className="flex flex-row justify-between gap-4">
+                            <p className="whitespace-nowrap">zoom</p>
+                            <p className="text-primary whitespace-nowrap">middle mouse / mousewheel</p>
+                        </div>
+                        <div className="flex flex-row justify-between gap-4">
+                            <p className="whitespace-nowrap">shift camera lock</p>
+                            <p className="text-primary whitespace-nowrap">shift</p>
+                        </div>
+                        <div className="flex flex-row justify-between gap-4">
+                            <p className="whitespace-nowrap">interact</p>
+                            <p className="text-primary whitespace-nowrap">E</p>
+                        </div>
+
+                    </div>
+                </div>
+
+                {/* Stats - needs parent node because Stats creates a raw DOM node and needs to appear it somewhere. otherwise, would default to document.body */}
+                {/* it does: "const parent = (parentProp && parentProp.current) || document.body; parent.appendChild(stats.dom)" */}
                 <div
-                    aria-hidden={!isHelpEnabled}
-                    className={`flex flex-col absolute px-5 py-4 left-0 gap-1.5 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all duration-200 ease-out 
-                        ${isHelpEnabled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"}`}
+                    ref={statsParentRef}
+                    aria-hidden
+                    className={`pointer-events-auto relative h-12 overflow-hidden transition-[width] duration-150 ${debugModeEnabled ? "w-20" : "w-0"}`}
                 >
-                    <h1 className="text-[1rem] text-center">Controls</h1>
-                    <hr />
-                    <div className="flex flex-row justify-between gap-4">
-                        <p className="whitespace-nowrap">move</p>
-                        <p className="text-primary whitespace-nowrap" >WASD</p>
-                    </div>
-                    <div className="flex flex-row justify-between gap-4">
-                        <p className="whitespace-nowrap">jump</p>
-                        <p className="text-primary whitespace-nowrap">SPACE</p>
-                    </div>
-                    <div className="flex flex-row justify-between gap-4">
-                        <p className="whitespace-nowrap">orbit</p>
-                        <p className="text-primary whitespace-nowrap">left mouse</p>
-                    </div>
-                    <div className="flex flex-row justify-between gap-4">
-                        <p className="whitespace-nowrap">zoom</p>
-                        <p className="text-primary whitespace-nowrap">middle mouse / mousewheel</p>
-                    </div>
-                    <div className="flex flex-row justify-between gap-4">
-                        <p className="whitespace-nowrap">shift camera lock</p>
-                        <p className="text-primary whitespace-nowrap">shift</p>
-                    </div>
-                    <div className="flex flex-row justify-between gap-4">
-                        <p className="whitespace-nowrap">interact</p>
-                        <p className="text-primary whitespace-nowrap">E</p>
-                    </div>
-
+                    {debugModeEnabled ? (
+                        <Stats
+                            parent={statsParentRef}
+                            showPanel={0}
+                            className="absolute! left-0! top-0! right-auto! bottom-auto!"
+                        />
+                    ) : null}
                 </div>
             </div>
 
@@ -141,7 +196,10 @@ const GameOverlay = () => {
                     type="button"
                     aria-label="Toggle settings"
                     aria-pressed={isSettingsEnabled}
-                    onClick={() => setIsSettingsEnabled((prev) => !prev)}
+                    onClick={(e) => {
+                        setIsSettingsEnabled((prev) => !prev);
+                        e.currentTarget.blur();
+                    }}
                     className={TOGGLE_BUTTON_CLASS}
                 >
                     <SettingsIcon className={`w-10 h-auto ${isSettingsEnabled ? "text-primary" : "text-white"}`} />
@@ -160,7 +218,10 @@ const GameOverlay = () => {
                             <ToggleButton
                                 ariaLabel="Toggle video screen"
                                 enabled={isVideoScreenEnabled}
-                                onToggle={() => setIsVideoScreenEnabled((prev) => !prev)}
+                                onToggle={(e) => {
+                                    setIsVideoScreenEnabled((prev) => !prev);
+                                    e.currentTarget.blur();
+                                }}
                             />
                         </div>
                         <div className="flex flex-row justify-between gap-4">
@@ -168,23 +229,32 @@ const GameOverlay = () => {
                             <ToggleButton
                                 ariaLabel="Toggle shadows"
                                 enabled={shadowsEnabled}
-                                onToggle={toggleShadowsEnabled}
+                                onToggle={(e) => { 
+                                    toggleShadowsEnabled();
+                                    e.currentTarget.blur();
+                                }}
                             />
                         </div>
                         <div className="flex flex-row justify-between gap-4">
                             <p className="whitespace-nowrap">Infinite Jump Enabled</p>
                             <ToggleButton
                                 ariaLabel="Toggle infinite jump"
-                                enabled={isInfiniteJumpEnabled}
-                                onToggle={() => setIsInfiniteJumpEnabled((prev) => !prev)}
+                                enabled={infiniteJumpEnabled}
+                                onToggle={(e) => {
+                                    toggleInfiniteJumpEnabled();
+                                    e.currentTarget.blur();
+                                }}
                             />
                         </div>
                         <div className="flex flex-row justify-between gap-4">
                             <p className="whitespace-nowrap">(Local) Debug Mode Enabled</p>
                             <ToggleButton
                                 ariaLabel="Toggle debug mode"
-                                enabled={isDebugModeEnabled}
-                                onToggle={() => setIsDebugModeEnabled((prev) => !prev)}
+                                enabled={debugModeEnabled}
+                                onToggle={(e) => {
+                                    toggleDebugModeEnabled();
+                                    e.currentTarget.blur();
+                                }}
                             />
                         </div>
                     </div>
@@ -196,16 +266,17 @@ const GameOverlay = () => {
                         <button
                             type="button"
                             className="w-full cursor-pointer rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white transition-opacity duration-150 ease-out hover:opacity-90 active:opacity-80"
-                            onClick={() => {
-                                // TODO: wire to multiplayer reset-character flow once server event exists.
-                            }}
+                            onClick={handleResetCharacterClick}
                         >
                             Reset Character
                         </button>
                         <button
                             type="button"
                             className="w-full cursor-pointer rounded-lg border border-red-300/30 bg-red-400/15 px-3 py-1.5 text-sm text-red-100 transition-opacity duration-150 ease-out hover:opacity-90 active:opacity-80"
-                            onClick={leaveRoom}
+                            onClick={(e) => {
+                                leaveRoom();
+                                e.currentTarget.blur();
+                            }}
                         >
                             Leave Room
                         </button>
@@ -216,10 +287,8 @@ const GameOverlay = () => {
                 </div>
             </div>
 
-            
             { cameraLockMode && <Crosshair /> }
-
-
+            
         </div>
     )
 }

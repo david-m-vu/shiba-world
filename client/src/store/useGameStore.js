@@ -10,6 +10,9 @@ export const useGameStore = create((set) => ({
     voiceEnabled: false,
     soundEnabled: true,
     shadowsEnabled: true,
+    infiniteJumpEnabled: false,
+    debugModeEnabled: false,
+    resetCharacterRequestId: 0,
 
     hasCreatedRoom: false,
     localPlayerName: "",
@@ -29,6 +32,16 @@ export const useGameStore = create((set) => ({
     },
     toggleShadowsEnabled: () => {
         set((state) => ({ shadowsEnabled: !state.shadowsEnabled }));
+    },
+    toggleInfiniteJumpEnabled: () => {
+        set((state) => ({ infiniteJumpEnabled: !state.infiniteJumpEnabled }));
+    },
+    toggleDebugModeEnabled: () => {
+        set((state) => ({ debugModeEnabled: !state.debugModeEnabled }));
+    },
+    // simply updating this resetCharacterRequestId state is what triggers a position/rotation/velocity reset in MultiplayerLayer.jsx
+    requestResetCharacter: () => {
+        set((state) => ({ resetCharacterRequestId: state.resetCharacterRequestId + 1 }));
     },
 
     createRoom: ({ playerName, roomId } = {}) => {

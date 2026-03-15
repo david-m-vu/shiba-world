@@ -9,17 +9,19 @@ import { ACESFilmicToneMapping } from "three";
 import { Physics } from "@react-three/rapier";
 import WorldShell from "./scenes/WorldShell.jsx";
 import LandingPresentationLayer from "./scenes/LandingPresentationLayer.jsx";
+import SharedEnvironment from "./scenes/SharedEnvironment.jsx";
 import Landing from "./ui/Landing.jsx";
 import GameOverlay from "./ui/GameOverlay.jsx";
 
 import { useGameStore } from "./store/useGameStore.js";
-
-const isDevMode = import.meta.env.VITE_DEV_MODE === "true";
+import { INITIAL_WORLD_CAMERA_POSITION } from "./constants/playerControls.js";
 
 const App = () => {
   const cameraLockMode = useGameStore((state) => state.cameraLockMode);
   const hasCreatedRoom = useGameStore((state) => state.hasCreatedRoom);
+  const sunsetMode = useGameStore((state) => state.sunsetMode);
   const shadowsEnabled = useGameStore((state) => state.shadowsEnabled);
+  const debugModeEnabled = useGameStore((state) => state.debugModeEnabled);
   const setCameraLockMode = useGameStore((state) => state.setCameraLockMode);
 
   // listen to when shift camera lock is activated through handlePointerLockChange in usePlayerInput - used app wide
@@ -48,7 +50,7 @@ const App = () => {
         <Canvas 
           shadows={shadowsEnabled}
           className="w-full h-full"
-          camera={{ position: [0, 6.5, -5] }}
+          camera={{ position: INITIAL_WORLD_CAMERA_POSITION }}
           gl={{
             toneMapping: ACESFilmicToneMapping,
             toneMappingExposure: 0.7,
@@ -56,7 +58,13 @@ const App = () => {
         > 
           {/* need to wrap in Suspense because WorldShell has async loaders (like useGLTF) that can suspend (need to wait) */}
           <Suspense>
-            <Physics debug={isDevMode} colliders="cuboid" gravity={[0, -9.81, 0]}>
+            <Physics debug={debugModeEnabled} colliders="cuboid" gravity={[0, -9.81, 0]}>
+              <SharedEnvironment
+                debug={debugModeEnabled}
+                isSunset={sunsetMode}
+                useOceanShaders={false}
+                shadowsEnabled={shadowsEnabled}
+              />
               {hasCreatedRoom ? <WorldShell /> : <LandingPresentationLayer />}
             </Physics>
           </Suspense>

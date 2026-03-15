@@ -1,17 +1,14 @@
 /**
- * This scene consists of the 3D demo world with cinematic camera movement for intro to be rendered with Landing.jsx, which is the UI overlay.
- * It's the animated background behind Landing.jsx
+ * Landing-only 3D presentation layer (camera movement), rendered on top of SharedEnvironment.
  */
 
 import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Vector3 } from "three";
 
-import SharedEnvironment from "./SharedEnvironment.jsx";
-import { useGameStore } from "../store/useGameStore.js";
-
 const CAMERA_FOCUS_POINT = new Vector3(0, 0, 0);
 
+// note we technically don't have to have this code in a separate component - can just do it in LandingPresentationlayer
 const LandingCameraRig = () => {
     const { camera } = useThree();
     const targetPositionRef = useRef(new Vector3());
@@ -60,18 +57,9 @@ const LandingCameraRig = () => {
 };
 
 const LandingPresentationLayer = () => {
-    const sunsetMode = useGameStore((state) => state.sunsetMode);
-    const shadowsEnabled = useGameStore((state) => state.shadowsEnabled);
-
     return (
         <>
             <LandingCameraRig />
-            <SharedEnvironment
-                debug={false}
-                isSunset={sunsetMode}
-                useOceanShaders={false}
-                shadowsEnabled={shadowsEnabled}
-            />
         </>
     );
 };

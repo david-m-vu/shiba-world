@@ -3,6 +3,7 @@ export const TURN_SPEED = 8;
 export const JUMP_IMPULSE = 6.5;
 export const HIDE_DISTANCE = 0.6;
 
+export const INITIAL_WORLD_CAMERA_POSITION = [0, 6.5, -5];
 export const CAMERA_TARGET_Y_OFFSET = 0.8;
 export const CAMERA_LOCK_TARGET_Y_OFFSET = 1.3;
 export const CAMERA_MIN_DISTANCE = 0.3;

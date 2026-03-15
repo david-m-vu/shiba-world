@@ -4,7 +4,7 @@ const Crosshair = () => {
     return (
         <div
             aria-hidden
-            className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none"
+            className="pointer-events-none fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 select-none" // same as transform: translate(-50%, -50%);
         >
             {/* <div className="relative h-8 w-8">
                 <span className="absolute left-1/2 top-0 h-3 w-px -translate-x-1/2 bg-white/90" />

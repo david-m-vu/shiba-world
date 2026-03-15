@@ -33,6 +33,7 @@ export const usePlayerMovement = ({ rapier, initialPosition = [0, 0, 0] }) => {
         jumpQueuedRef,
         cameraYawRef,
         cameraPitchRef,
+        infiniteJumpEnabled = false,
     }) => {
         const currentPos = rb.translation(); // current rigid body's world position
         const currentVel = rb.linvel();
@@ -106,7 +107,7 @@ export const usePlayerMovement = ({ rapier, initialPosition = [0, 0, 0] }) => {
 
         // Queue jump on key press and consume it once per frame.
         if (jumpQueuedRef.current) {
-            if (grounded) {
+            if (grounded || infiniteJumpEnabled) {
                 rb.applyImpulse({ x: 0, y: JUMP_IMPULSE, z: 0 }, true);
             }
             jumpQueuedRef.current = false;

@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { Stats, useGLTF } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import { GUI } from "dat.gui";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 
@@ -22,6 +22,8 @@ import {
 } from "../components/world/objects/index.js";
 
 import { createDeterministicRandom, randomRange } from "../lib/util.js";
+
+const showDatGUI = import.meta.env.VITE_SHOW_DAT_GUI === "true";
 
 const GGB_URL = new URL("../assets/golden_gate_bridge/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
 
@@ -238,7 +240,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
 
     const { scene: ggbModel } = useGLTF(GGB_URL);
 
-    const showGui = debug;
+    const showGui = showDatGUI;
 
     useEffect(() => {
         // walk every child in the gltf scene graph, and for each mesh, make it so it casts shadows and receives shadows
@@ -655,8 +657,6 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
                     <axesHelper args={[20]} position={[0, 1, 0]} />
                 </>
             ) : null}
-
-            {showGui ? <Stats showPanel={0} className="left-0! right-auto! top-auto! bottom-0!" /> : null}
 
         </>
     );
