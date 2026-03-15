@@ -38,9 +38,7 @@ const CoffeeTable = ({
         <RigidBody
             position={basePosition}
             rotation={rotation}
-            density={5}            // heavier
-            linearDamping={20}   // slows sliding
-            angularDamping={20}  // slows spinning
+            {...defaultRigidBodyProps}
             {...rigidBodyProps}
         >
             <CuboidCollider 

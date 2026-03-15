@@ -1,7 +1,10 @@
+export const AVATAR_POSITION_OFFSET = [0, 1.0053, 0.5] // this is for the dog since the model baseline is weird
+export const AVATAR_ESTIMATE_SIZE = [1, 1, 1]
+
 export const LOCAL_MOVE_SPEED = 12; // originally 8
 export const TURN_SPEED = 8;
-export const JUMP_IMPULSE = 6.5;
-export const HIDE_DISTANCE = 0.6;
+export const JUMP_IMPULSE = 6; // orig 6.5
+export const HIDE_DISTANCE = 1.4;
 
 export const INITIAL_WORLD_CAMERA_POSITION = [0, 6.5, -5];
 export const CAMERA_TARGET_Y_OFFSET = 0.8;

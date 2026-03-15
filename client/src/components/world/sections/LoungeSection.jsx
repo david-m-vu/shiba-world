@@ -2,11 +2,16 @@
  * This file handles rendering non-player objects in the room
  */
 
+import { useGLTF } from "@react-three/drei";
+import { useEffect } from "react";
+
 import Planter from "../objects/Planter.jsx";
 import Couch from "../objects/Couch.jsx";
 import CoffeeTable from "../objects/CoffeeTable.jsx";
 import { Grass } from "../objects/Grass.jsx";
 import DiningSetSection from "../objects/DiningSet.jsx";
+
+const ANIME_GIRL_URL = new URL("../../../assets/just_a_girl/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
 
 const LoungeSection = ({
     position = [0, 0, 0],
@@ -18,6 +23,19 @@ const LoungeSection = ({
     plantColor = "#2c5a3a",
     ...groupProps
 }) => {
+    
+    const { scene: animeGirlModel } = useGLTF(ANIME_GIRL_URL);
+
+    useEffect(() => {
+        // walk every child in the gltf scene graph, and for each mesh, make it so it casts shadows and receives shadows
+        animeGirlModel.traverse((child) => { 
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+    }, [animeGirlModel]);
+    
     const mainPlanter = { size: [9, 1, 2], position: [0, 0, 0] };
     const sidePlanter = { size: [1, 1, 4] };
     const rightPlanter = { size: [2, 1, 2] };
@@ -60,6 +78,8 @@ const LoungeSection = ({
                 size={[3, 0.1, 15]}
                 anchor="minXmaxZ"
             />
+
+            <primitive object={animeGirlModel} position={[0, 0, -12]} scale={0.05}/>
 
             <Planter
                 position={[mainHalfW, 0, -(mainPlanter.size[2] / 2 + 15 )]}

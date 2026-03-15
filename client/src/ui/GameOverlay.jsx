@@ -20,8 +20,26 @@ import ToggleButton from "../components/ui/ToggleButton.jsx";
 const TOGGLE_BUTTON_CLASS =
     "cursor-pointer transition-transform duration-150 ease-out hover:scale-[1.02] active:scale-100 hover:opacity-95 active:opacity-90";
 
+const HELP_OVERLAY_SEEN_KEY = "shiba-world-help-overlay-seen-v1";
+
+const getIsFirstVisit = () => {
+    // default to true for non-browser environments (window.locaStorage would through)
+    if (typeof window === "undefined") {
+        return true;
+    }
+
+    try {
+        // if seen value in local storage is 1, that means user has saved this key in their localStorage --> they've ran help info useEffect before
+        return window.localStorage.getItem(HELP_OVERLAY_SEEN_KEY) !== "1";
+    } catch {
+        // If storage is unavailable, keep onboarding behavior.
+        return true;
+    }
+};
+
 const GameOverlay = () => {
-    const [isHelpEnabled, setIsHelpEnabled] = useState(true);
+    const [isFirstVisit] = useState(() => getIsFirstVisit());
+    const [isHelpEnabled, setIsHelpEnabled] = useState(isFirstVisit);
     const [isSettingsEnabled, setIsSettingsEnabled] = useState(false);
 
     const [isVideoScreenEnabled, setIsVideoScreenEnabled] = useState(true);
@@ -44,8 +62,18 @@ const GameOverlay = () => {
     const requestResetCharacter = useGameStore((state) => state.requestResetCharacter);
     const leaveRoom = useGameStore((state) => state.leaveRoom);
 
-    // Show help dropdown on world join, then auto-hide
+    // Show help dropdown for first-time visitors, then auto-hide once.
     useEffect(() => {
+        if (!isFirstVisit) {
+            return;
+        }
+
+        try { // sicne localStorage can throw at runtime in some environments
+            window.localStorage.setItem(HELP_OVERLAY_SEEN_KEY, "1");
+        } catch {
+            // no-op
+        }
+
         const autoHideHelpTimeoutId = window.setTimeout(() => {
             setIsHelpEnabled(false);
         }, 8000);
@@ -54,7 +82,7 @@ const GameOverlay = () => {
         return () => {
             window.clearTimeout(autoHideHelpTimeoutId);
         };
-    }, []);
+    }, [isFirstVisit]);
 
     const handleResetCharacterClick = (event) => {
         requestResetCharacter();

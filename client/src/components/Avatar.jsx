@@ -4,7 +4,9 @@
 
 import { useEffect, useMemo } from "react";
 import { useGLTF } from "@react-three/drei";
-import { RigidBody } from "@react-three/rapier";
+import { RigidBody, CapsuleCollider } from "@react-three/rapier";
+
+import { AVATAR_POSITION_OFFSET } from "../constants/playerControls";
 
 const DOG_URL = new URL("../assets/shiba/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
 
@@ -16,6 +18,7 @@ const Avatar = ({
     usePhysics = false,
     rigidBodyRef = null,
     rigidBodyProps = {},
+    colliderProps = {},
     visualRef = null, // represents the group ref
 }) => {
     const { scene } = useGLTF(DOG_URL); // load GLTF file, and also cache result so multiple avatars can reuse the same loaded data
@@ -33,33 +36,36 @@ const Avatar = ({
         });
     }, [model]);
 
-    const body = (
+    // avatar mesh is a child of a RigidBody so it moves with the body automatically
+    const avatarMesh = (
         <group ref={visualRef} visible={!hidden} scale={scale}>
             {/* primitive lets us render a raw three.js object directly - attach this three.js object into the React scene graph */}
-            {/* <primitive object={model} scale={scale} />  */}
-            <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
+            <primitive object={model} position={AVATAR_POSITION_OFFSET} /> 
+            {/* <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial />
-            </mesh>
+            </mesh> */}
         </group>
     );
 
     if (usePhysics) {
         return (
+            // in our setup, RigidBody origin is used by movement/camera/ground checks, so keeping collider offset on the collider is usually better
             <RigidBody
                 ref={rigidBodyRef}
                 position={position}
                 rotation={rotation}
                 {...rigidBodyProps}
             >
-                {body}
+                <CapsuleCollider {...colliderProps} />
+                {avatarMesh}
             </RigidBody>
         );
     }
 
     return (
         <group position={position} rotation={rotation}>
-            {body}
+            {avatarMesh}
         </group>
     );
 };

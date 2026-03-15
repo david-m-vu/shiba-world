@@ -39,7 +39,7 @@ const Landing = () => {
 
             {/* Main card */}
             <div className="text-2xl text-center flex flex-col gap-5 px-10 py-10 bg-[rgba(29,29,29,0.7)] rounded-xl w-[clamp(375px,46rem,90vw)]">
-                <p>create and share rooms, hang out, chat, and watch videos together in real time inside a virtual 3D world - performance-optimized and  no download required!</p>
+                <p>create and share rooms, hang out, chat, and watch videos together in real time inside a virtual 3D world - no download required!</p>
 
                 <hr />
 

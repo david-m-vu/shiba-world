@@ -37,7 +37,7 @@ export const usePlayerMovement = ({ rapier, initialPosition = [0, 0, 0] }) => {
     }) => {
         const currentPos = rb.translation(); // current rigid body's world position
         const currentVel = rb.linvel();
-        localPosition.set(currentPos.x, currentPos.y, currentPos.z);
+        localPosition.set(currentPos.x, currentPos.y, currentPos.z); // sync non-physics localPosition
 
         // Cast multiple short downward rays around the avatar's feet for robust grounded checks.
         let grounded = false;

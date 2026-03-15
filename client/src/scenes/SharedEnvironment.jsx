@@ -26,6 +26,7 @@ import { createDeterministicRandom, randomRange } from "../lib/util.js";
 const showDatGUI = import.meta.env.VITE_SHOW_DAT_GUI === "true";
 
 const GGB_URL = new URL("../assets/golden_gate_bridge/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
+const ANIME_GIRL_URL = new URL("../assets/just_a_girl/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
 
 const DEFAULT_COLORS = {
     background: "#9fc4ff",
@@ -157,6 +158,27 @@ const SKYLINE_LAYERS = [
         windowOpacityMin: 0.06,
         windowOpacityMax: 0.12,
     },
+    {
+        name: "nearer",
+        count: 0,
+        radiusMin: 40,
+        radiusMax: 60,
+        widthMin: 12,
+        widthMax: 24,
+        depthMin: 10,
+        depthMax: 22,
+        heightMin: 10,
+        heightMax: 28,
+        sectorCount: 10,
+        sectorJitter: 0.22,
+        tallAccentChance: 0,
+        setbackChance: 0.2,
+        windowChance: 0.92,
+        emissiveMin: 0.15,
+        emissiveMax: 0.22,
+        windowOpacityMin: 0.12,
+        windowOpacityMax: 0.2,
+    },
 ];
 
 const generateSkylineBuildings = (seed = 20260313) => {
@@ -170,7 +192,7 @@ const generateSkylineBuildings = (seed = 20260313) => {
         // for each building in layer
         for (let i = 0; i < layer.count; i++) {
             const sector = Math.floor(rng() * layer.sectorCount); // random sector index
-            const angle = (sector * arcPerSector) + randomRange(rng, -layer.sectorJitter, layer.sectorJitter); // add some jitter to angle
+            const angle = (sector * arcPerSector) + randomRange(rng, -layer.sectorJitter, layer.sectorJitter); // add some jitter to angle (radians)
             const radius = randomRange(rng, layer.radiusMin, layer.radiusMax);
 
             // multiply x and z by constants to make spawning area ellipse like
@@ -239,8 +261,19 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
     const guiRef = useRef(null);
 
     const { scene: ggbModel } = useGLTF(GGB_URL);
+    const { scene: animeGirlModel } = useGLTF(ANIME_GIRL_URL);
 
-    const showGui = showDatGUI;
+    showDatGUI;
+
+    useEffect(() => {
+        // walk every child in the gltf scene graph, and for each mesh, make it so it casts shadows and receives shadows
+        animeGirlModel.traverse((child) => { 
+            if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+            }
+        });
+    }, [animeGirlModel]);
 
     useEffect(() => {
         // walk every child in the gltf scene graph, and for each mesh, make it so it casts shadows and receives shadows
@@ -253,7 +286,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
     }, [ggbModel]);
 
     useEffect(() => {
-        if (!showGui) return;
+        if (!showDatGUI) return;
         const safeDestroy = (gui) => {
             if (!gui) return;
             try {
@@ -345,7 +378,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
             safeDestroy(guiRef.current);
             guiRef.current = null;
         };
-    }, [showGui]);
+    }, []);
 
     return (
         <>
@@ -394,6 +427,8 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
                         size={[0.1, 3, 2]}
                         color={colors.door}
                     />
+                    {/* <primitive object={animeGirlModel} position={[0, BULKHEAD_SIZE[1], 0]} scale={0.05}/> */}
+
                 </group>
                 
 

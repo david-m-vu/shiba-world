@@ -28,7 +28,7 @@ const PreethamSky = ({
         const phi = MathUtils.degToRad(90 - elevation);
         const theta = MathUtils.degToRad(azimuth);
         const sun = new Vector3();
-        sun.setFromSphericalCoords(1, phi, theta);
+        sun.setFromSphericalCoords(50, phi, theta); // sun is 50 units away from the origin
         return sun;
     }, [elevation, azimuth]);
 
