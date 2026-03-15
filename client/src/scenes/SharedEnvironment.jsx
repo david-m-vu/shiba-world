@@ -25,8 +25,9 @@ import { createDeterministicRandom, randomRange } from "../lib/util.js";
 
 const showDatGUI = import.meta.env.VITE_SHOW_DAT_GUI === "true";
 
-const GGB_URL = new URL("../assets/golden_gate_bridge/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
-const ANIME_GIRL_URL = new URL("../assets/just_a_girl/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
+// public/ is served at the app root URL, so client/public/models/shiba/scene.gltf is available at /models/shiba/scene.gltf
+const GGB_URL = "/models/golden_gate_bridge/scene.gltf";
+const ANIME_GIRL_URL = "/models/just_a_girl/scene.gltf";
 
 const DEFAULT_COLORS = {
     background: "#9fc4ff",
@@ -261,19 +262,17 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
     const guiRef = useRef(null);
 
     const { scene: ggbModel } = useGLTF(GGB_URL);
-    const { scene: animeGirlModel } = useGLTF(ANIME_GIRL_URL);
+    // const { scene: animeGirlModel } = useGLTF(ANIME_GIRL_URL);
 
-    showDatGUI;
-
-    useEffect(() => {
-        // walk every child in the gltf scene graph, and for each mesh, make it so it casts shadows and receives shadows
-        animeGirlModel.traverse((child) => { 
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-            }
-        });
-    }, [animeGirlModel]);
+    // useEffect(() => {
+    //     // walk every child in the gltf scene graph, and for each mesh, make it so it casts shadows and receives shadows
+    //     animeGirlModel.traverse((child) => { 
+    //         if (child.isMesh) {
+    //             child.castShadow = true;
+    //             child.receiveShadow = true;
+    //         }
+    //     });
+    // }, [animeGirlModel]);
 
     useEffect(() => {
         // walk every child in the gltf scene graph, and for each mesh, make it so it casts shadows and receives shadows

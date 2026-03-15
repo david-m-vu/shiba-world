@@ -11,7 +11,8 @@ import CoffeeTable from "../objects/CoffeeTable.jsx";
 import { Grass } from "../objects/Grass.jsx";
 import DiningSetSection from "../objects/DiningSet.jsx";
 
-const ANIME_GIRL_URL = new URL("../../../assets/just_a_girl/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
+// public/ is served at the app root URL, so client/public/models/shiba/scene.gltf is available at /models/shiba/scene.gltf
+const ANIME_GIRL_URL = "/models/just_a_girl/scene.gltf";
 
 const LoungeSection = ({
     position = [0, 0, 0],

@@ -8,7 +8,8 @@ import { RigidBody, CapsuleCollider } from "@react-three/rapier";
 
 import { AVATAR_POSITION_OFFSET } from "../constants/playerControls";
 
-const DOG_URL = new URL("../assets/shiba/scene.gltf", import.meta.url).href; // need URL to turn relative file path into a real, bundled URL
+// public/ is served at the app root URL, so client/public/models/shiba/scene.gltf is available at /models/shiba/scene.gltf
+const DOG_URL = "/models/shiba/scene.gltf";
 
 const Avatar = ({
     position = [0, 0, 0],
