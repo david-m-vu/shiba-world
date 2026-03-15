@@ -126,7 +126,7 @@ const LoungeChair = ({
             {/* fabric bed */}
             <mesh position={[0, bedY, 0]} castShadow receiveShadow>
                 <boxGeometry args={bedSize} />
-                <meshStandardMaterial color={fabricColor} roughness={0.8} metalness={0} />
+                <meshStandardMaterial color={fabricColor} roughness={0.6} metalness={0} />
             </mesh>
 
             {/* backrest */}

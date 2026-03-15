@@ -13,6 +13,7 @@ const DEFAULT_PARAMS = { // for a bright day
 
 const PreethamSky = ({
     isDefaultSky = false,
+    shadowsEnabled = true,
     lightColor = "#ffffff",
     distance = 450000,
     turbidity = 10,
@@ -34,7 +35,7 @@ const PreethamSky = ({
     return (
         <> 
             <directionalLight
-                castShadow
+                castShadow={shadowsEnabled}
                 intensity={0.9}
                 position={isDefaultSky ? DEFAULT_PARAMS.sunPosition : sunPosition}
                 shadow-mapSize-width={2048} // horizontal resolution of the shadow texture

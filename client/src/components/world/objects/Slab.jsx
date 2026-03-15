@@ -12,8 +12,8 @@ const Slab = ({
     color = "#c6e0c7",
     surfaceColor = "#ffffff",
     surfaceOffset = 0.01,
-    metalness = 0,
-    roughness = 1,
+    metalness = 0.2,
+    roughness = 0.5,
     hasSeparateSurface = false,
     ...meshProps
 }) => {

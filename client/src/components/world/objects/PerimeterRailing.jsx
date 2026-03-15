@@ -7,7 +7,7 @@ const PerimeterRailing = ({
     args,
     color,
     metalness = 0,
-    roughness = 1,
+    roughness = 0.5,
     anchor = "center",
     rotation = [0, 0, 0],
     ...meshProps

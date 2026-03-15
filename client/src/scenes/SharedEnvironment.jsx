@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useGLTF } from "@react-three/drei";
+import { Stats, useGLTF } from "@react-three/drei";
 import { GUI } from "dat.gui";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 
@@ -206,7 +206,7 @@ const generateSkylineBuildings = (seed = 20260313) => {
                 layerIndex,
                 position: [x, z],
                 size: [width, height, depth],
-                roughness: randomRange(rng, 0.84, 0.98),
+                roughness: randomRange(rng, 0.55, 0.85),
                 emissiveIntensity: randomRange(rng, layer.emissiveMin, layer.emissiveMax),
                 hasSetback,
                 setbackSize: [
@@ -230,7 +230,7 @@ const generateSkylineBuildings = (seed = 20260313) => {
 
 const SKYLINE_BUILDINGS = generateSkylineBuildings();
 
-const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = false }) => {
+const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = false, shadowsEnabled = true }) => {
     const [colors, setColors] = useState(DEFAULT_COLORS);
     const [skyParams, setSkyParams] = useState(SKY_PARAMS);
     const skyParamsRef = useRef({ ...SKY_PARAMS }); // need this because dat.gui needs a stable object reference to mutate, sine useState setState creates new objects
@@ -238,7 +238,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
 
     const { scene: ggbModel } = useGLTF(GGB_URL);
 
-    const showGui = debug || import.meta.env.DEV;
+    const showGui = debug;
 
     useEffect(() => {
         // walk every child in the gltf scene graph, and for each mesh, make it so it casts shadows and receives shadows
@@ -357,6 +357,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
 
             <PreethamSky
                 isDefaultSky={!isSunset}
+                shadowsEnabled={shadowsEnabled}
                 lightColor={isSunset ? colors.sunsetLight : "#ffffff"}
                 distance={skyParams.skyDistance}
                 elevation={skyParams.skyElevation}
@@ -530,7 +531,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
                             <meshStandardMaterial
                                 color={colors.skyline}
                                 roughness={building.roughness}
-                                metalness={0.06}
+                                metalness={isSunset ? 0.5 : 0.06} // try 0.5 for sunset to make it look darker and shinier
                                 emissive={colors.skylineEmissive}
                                 emissiveIntensity={building.emissiveIntensity}
                             />
@@ -548,7 +549,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
                                 <meshStandardMaterial
                                     color={colors.skyline}
                                     roughness={Math.min(1, building.roughness + 0.04)}
-                                    metalness={0.04}
+                                    metalness={isSunset ? 0.4 : 0.04} // try 0.5 for sunset to make it look darker and shinier
                                     emissive={colors.skylineEmissive}
                                     emissiveIntensity={building.emissiveIntensity * 0.8}
                                 />
@@ -648,11 +649,14 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
                 rotation={[0, -Math.PI/8, 0]}
             />
 
+            {/* debug */}
             {debug ? (
                 <>
                     <axesHelper args={[20]} position={[0, 1, 0]} />
                 </>
             ) : null}
+
+            {showGui ? <Stats showPanel={0} className="left-0! right-auto! top-auto! bottom-0!" /> : null}
 
         </>
     );
