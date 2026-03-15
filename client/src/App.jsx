@@ -50,7 +50,7 @@ const App = () => {
         <Canvas 
           shadows={shadowsEnabled}
           className="w-full h-full"
-          camera={{ position: INITIAL_WORLD_CAMERA_POSITION }}
+          camera={{ position: [44, 16, 0] }}
           gl={{
             toneMapping: ACESFilmicToneMapping,
             toneMappingExposure: 0.7,
