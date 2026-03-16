@@ -42,13 +42,13 @@ const GameOverlay = () => {
     const [isHelpEnabled, setIsHelpEnabled] = useState(isFirstVisit);
     const [isSettingsEnabled, setIsSettingsEnabled] = useState(false);
 
-    const [isVideoScreenEnabled, setIsVideoScreenEnabled] = useState(true);
     const statsParentRef = useRef(null);
  
     const cameraLockMode = useGameStore((state) => state.cameraLockMode);
     const sunsetMode = useGameStore((state) => state.sunsetMode);
     const voiceEnabled = useGameStore((state) => state.voiceEnabled);
     const soundEnabled = useGameStore((state) => state.soundEnabled);
+    const videoScreenEnabled = useGameStore((state) => state.videoScreenEnabled);
     const shadowsEnabled = useGameStore((state) => state.shadowsEnabled);
     const infiniteJumpEnabled = useGameStore((state) => state.infiniteJumpEnabled);
     const debugModeEnabled = useGameStore((state) => state.debugModeEnabled);
@@ -56,6 +56,7 @@ const GameOverlay = () => {
     const toggleSunsetMode = useGameStore((state) => state.toggleSunsetMode);
     const toggleVoiceEnabled = useGameStore((state) => state.toggleVoiceEnabled);
     const toggleSoundEnabled = useGameStore((state) => state.toggleSoundEnabled);
+    const toggleVideoScreenEnabled = useGameStore((state) => state.toggleVideoScreenEnabled);
     const toggleShadowsEnabled = useGameStore((state) => state.toggleShadowsEnabled);
     const toggleInfiniteJumpEnabled = useGameStore((state) => state.toggleInfiniteJumpEnabled);
     const toggleDebugModeEnabled = useGameStore((state) => state.toggleDebugModeEnabled);
@@ -245,9 +246,9 @@ const GameOverlay = () => {
                             <p className="whitespace-nowrap">(Local) Video Screen Enabled</p>
                             <ToggleButton
                                 ariaLabel="Toggle video screen"
-                                enabled={isVideoScreenEnabled}
+                                enabled={videoScreenEnabled}
                                 onToggle={(e) => {
-                                    setIsVideoScreenEnabled((prev) => !prev);
+                                    toggleVideoScreenEnabled();
                                     e.currentTarget.blur();
                                 }}
                             />

@@ -12,6 +12,7 @@ export const useGameStore = create(
             sunsetMode: true,
             voiceEnabled: false,
             soundEnabled: true,
+            videoScreenEnabled: true,
             shadowsEnabled: true,
             infiniteJumpEnabled: false,
             debugModeEnabled: false,
@@ -32,6 +33,9 @@ export const useGameStore = create(
             },
             toggleSoundEnabled: () => {
                 set((state) => ({ soundEnabled: !state.soundEnabled }));
+            },
+            toggleVideoScreenEnabled: () => {
+                set((state) => ({ videoScreenEnabled: !state.videoScreenEnabled }));
             },
             toggleShadowsEnabled: () => {
                 set((state) => ({ shadowsEnabled: !state.shadowsEnabled }));

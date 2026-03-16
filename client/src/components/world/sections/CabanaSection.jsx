@@ -1,4 +1,5 @@
 import { anchorOffset } from "../../../lib/util.js";
+import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import Couch from "../objects/Couch.jsx";
 import LoungeChair from "../objects/LoungeChair.jsx";
 import CoffeeTable from "../objects/CoffeeTable.jsx";
@@ -32,10 +33,17 @@ const CabanaSection = ({
 
     const postHeight = height; // legs
     const railY = height - beamThickness / 2; // horizontal rails
+    const roofColliderThickness = Math.max(beamThickness, slatThickness);
     const innerW = width - postThickness * 2;
     const innerD = depth - postThickness * 2;
     const slatCount = Math.max(3, Math.floor(innerD / (slatThickness + slatGap)));
     const slatStartZ = -innerD / 2 + slatThickness;
+    const postPositions = [
+        [halfW - postThickness / 2, postHeight / 2, halfD - postThickness / 2], // back left
+        [-halfW + postThickness / 2, postHeight / 2, halfD - postThickness / 2], // back right
+        [halfW - postThickness / 2, postHeight / 2, -halfD + postThickness / 2], // front left
+        [-halfW + postThickness / 2, postHeight / 2, -halfD + postThickness / 2], // front right
+    ];
 
     const chairOffsetX = width * 0.25;
     const chairOffsetZ = depth * 0.25;
@@ -53,14 +61,30 @@ const CabanaSection = ({
             scale={scale}
             {...groupProps}
         >
+            {/* Physics Colliders */}
+            <RigidBody type="fixed" colliders={false}>
+                {/* AABB-style roof block over the top beams/slats area */}
+                <CuboidCollider
+                    position={[0, height - (roofColliderThickness / 2), 0]}
+                    args={[
+                        width / 2,
+                        roofColliderThickness / 2,
+                        depth / 2,
+                    ]}
+                />
+                {/* collider for posts */}
+                {postPositions.map((postPosition, index) => (
+                    <CuboidCollider
+                        key={`post-collider-${index}`}
+                        position={postPosition}
+                        args={[postThickness / 2, postHeight / 2, postThickness / 2]}
+                    />
+                ))}
+            </RigidBody>
+
             {/* posts */}
-            {[
-                [halfW - postThickness / 2, postHeight / 2, halfD - postThickness / 2], // back left
-                [-halfW + postThickness / 2, postHeight / 2, halfD - postThickness / 2], // back right
-                [halfW - postThickness / 2, postHeight / 2, -halfD + postThickness / 2], // front left
-                [-halfW + postThickness / 2, postHeight / 2, -halfD + postThickness / 2], // front right
-            ].map((pos, index) => (
-                <mesh key={`post-${index}`} position={pos} castShadow receiveShadow>
+            {postPositions.map((postPosition, index) => (
+                <mesh key={`post-${index}`} position={postPosition} castShadow receiveShadow>
                     <boxGeometry args={[postThickness, postHeight, postThickness]} />
                     <meshStandardMaterial color={frameColor} roughness={0.5} metalness={0.2} />
                 </mesh>

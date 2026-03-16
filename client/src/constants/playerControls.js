@@ -1,4 +1,4 @@
-export const AVATAR_POSITION_OFFSET = [0, 1.0053, 0.5] // this is for the dog since the model baseline is weird
+export const AVATAR_POSITION_OFFSET = [0, 1.0053, 0.5231] // this is for the dog since the model baseline is weird
 export const AVATAR_ESTIMATE_SIZE = [1, 1, 1]
 
 export const LOCAL_MOVE_SPEED = 12; // originally 8

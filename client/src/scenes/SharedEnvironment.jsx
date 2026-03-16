@@ -7,9 +7,12 @@ import { useGLTF } from "@react-three/drei";
 import { GUI } from "dat.gui";
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 
+import { createDeterministicRandom, randomRange } from "../lib/util.js";
+import { useGameStore } from "../store/useGameStore.js";
+
 import PreethamSky from "../components/PreethamSky.jsx";
 import OceanBackdrop from "../components/OceanBackdrop.jsx";
-import { LoungeChairSection, LoungeSection, CabanaSection, PlayAreaSection, DiningSetSection } from "../components/world/sections/index.js";
+import { LoungeChairSection, LoungeSection, CabanaSection, PlayAreaSection } from "../components/world/sections/index.js";
 import {
     CoffeeTable,
     Couch,
@@ -18,10 +21,9 @@ import {
     Planter,
     Slab,
     Grass,
-    CanopyLight
+    CanopyLight,
+    FlyingScreen
 } from "../components/world/objects/index.js";
-
-import { createDeterministicRandom, randomRange } from "../lib/util.js";
 
 const showDatGUI = import.meta.env.VITE_SHOW_DAT_GUI === "true";
 
@@ -50,7 +52,11 @@ const DEFAULT_COLORS = {
     ocean: "#60899F", // orig #5f7f98
     oceanHighlight: "#83aac4",
     sunsetLight: "#fb7739",
-    canopyLight: "#fff1d1" // #efb92e for more orange
+    canopyLight: "#fff1d1", // #efb92e for more orange
+    screen: "#000000",
+    screenFrame: "#808080",
+    screenSupport: "#000000",
+    screenBack: "#808080",
 };
 
 const SKY_PARAMS = {
@@ -258,8 +264,11 @@ const SKYLINE_BUILDINGS = generateSkylineBuildings();
 const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = false, shadowsEnabled = true }) => {
     const [colors, setColors] = useState(DEFAULT_COLORS);
     const [skyParams, setSkyParams] = useState(SKY_PARAMS);
+    
     const skyParamsRef = useRef({ ...SKY_PARAMS }); // need this because dat.gui needs a stable object reference to mutate, sine useState setState creates new objects
     const guiRef = useRef(null);
+
+    const videoScreenEnabled = useGameStore((state) => state.videoScreenEnabled);
 
     const { scene: ggbModel } = useGLTF(GGB_URL);
     // const { scene: animeGirlModel } = useGLTF(ANIME_GIRL_URL);
@@ -364,6 +373,13 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
         const plants = gui.addFolder("Plants");
         plants.open();
         addFolderColor(plants, "plant", "Plant");
+
+        const screen = gui.addFolder("Screen");
+        screen.open();
+        addFolderColor(screen, "screen", "Screen");
+        addFolderColor(screen, "screenFrame", "Screen Frame");
+        addFolderColor(screen, "screenSupport", "Screen Support");
+        addFolderColor(screen, "screenBack", "Screen Back");
 
         const skyline = gui.addFolder("Skyline");
         skyline.open();
@@ -554,6 +570,18 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
                 tvScreenSize={[3.0, 1.6, 0.06]}
                 frameColor={colors.frame}
             />
+
+            {videoScreenEnabled && 
+                <FlyingScreen
+                    position={[0, 10, 25]}
+                    rotation={[0, Math.PI, 0]}
+                    screenColor={colors.screen}
+                    frameColor={colors.screenFrame}
+                    supportColor={colors.screenSupport}
+                    backColor={colors.screenBack}
+                />
+            }
+            
 
             {/* skyline backdrop */}
             <group>

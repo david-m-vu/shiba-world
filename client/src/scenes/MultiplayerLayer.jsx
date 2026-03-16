@@ -170,10 +170,10 @@ const MultiplayerLayer = () => {
                 colliderProps={{
                     // Capsule args: [halfHeight, radius]. Rotate 90deg on X so the long axis runs along local Z.
                     // z size = 2(halfHeight + radius)
-                    // position.z = model z midpoint / 2
+                    // position.z = model z midpoint
                     // position.y --> collider y midpoint - radius = 0
                     args: [0.44, 0.45],
-                    position: [0, 0.45, -0.02], // keep capsule bottom near y=0 and center it on the shiba body
+                    position: [0, 0.45, 0], // keep capsule bottom near y=0 and center it on the shiba body
                     rotation: [Math.PI / 2, 0, 0],
                 }}
                 visualRef={localVisualRef}
