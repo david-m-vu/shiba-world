@@ -470,7 +470,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
                     size={CANTILEVER_OVERHANG_SIZE}
                     anchor="minXminZ"
                     color={colors.overhangSlab}
-                    roughness={0.85}
+                    // roughness={0.85}
                     surfaceColor={colors.rooftopSurface}
                 />
 
