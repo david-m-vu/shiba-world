@@ -56,7 +56,7 @@ export const useThirdPersonCamera = ({ initialPosition = [0, 0, 0] }) => {
             camera.position.copy(cameraTarget).addScaledVector(cameraForward, -cameraDistanceRef.current);
             camera.lookAt(cameraTarget);
             
-            // to make sure orbital controls stays consistent when switched even while controls are dsiabled
+            // to make sure orbital controls stays consistent when switched even while controls are disabled
             // so when you unlock, OrbitControls already has the correct target
             controls.target.copy(cameraTarget);
             previousTarget.copy(localPosition);

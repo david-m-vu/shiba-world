@@ -53,6 +53,8 @@ const normalizePlayer = (player = {}) => {
     }
 }
 
+// This function normalizes each player in the players array and spreads them out in an object. 
+// Returns this object
 const playersToMap = (players = []) => {
     // use object instead of map because zustand + react updates are easier, and objects serialize easily
     const nextPlayersById = {};
@@ -89,7 +91,6 @@ const applyRoomSnapshot = (set, roomSnapshot = {}, selfPlayerId = null) => {
         hostSocketId: normalizedRoomState.hostSocketId,
         playersById: normalizedRoomState.playersById,
         messages: normalizedRoomState.messages,
-        roomErrorMessage: ""
     })
 }
 
@@ -149,7 +150,6 @@ const bindSocketListeners = (set, get, socket) => {
 
     socket.on("room:error", (payload = {}) => {
         const message = String(payload.message ?? "Room error.");
-        set({ roomErrorMessage: message });
         get().pushToast(message, {
             type: "error"
         });
@@ -268,13 +268,12 @@ export const useGameStore = create(
             socketId: null, // technically the same as selfPlayerId for now
             socketConnected: false,
             socketListenersReady: false,
-            socketErrorMessage: "",
-            roomErrorMessage: "",
+            socketErrorMessage: "", // note this is temporarily unused - would use if we want to add a persistent offline/connection banner
             localBubbleClearTimeoutId: null,
             toasts: [],
 
             // synced state
-            playersById: {},
+            playersById: {}, // object that maps player IDs to player objects
             messages: [],
 
             pushToast: (message, { durationMs = DEFAULT_TOAST_DURATION_MS, highlightText = "", type = "info" } = {}) => {
@@ -360,7 +359,6 @@ export const useGameStore = create(
                     set({
                         socket,
                         socketErrorMessage: "",
-                        roomErrorMessage: "",
                         socketListenersReady: false,
                     })
                 }
@@ -404,29 +402,23 @@ export const useGameStore = create(
             },
 
             createRoom: async ({ playerName, worldType = "rooftop" } = {}) => {
-                const safePlayerName = (playerName ?? "").trim();
-                if (!safePlayerName) {
-                    set({ roomErrorMessage: "Name is required." })
-                    return { ok: false, message: "Name is required" }
-                }
-
+                // note this function assumes that playerName is safe (already trimmed)
                 try {
                     const socket = await get().initializeSocket();
                     const response = await emitWithAck(socket, "room:create", {
-                        playerName: safePlayerName,
+                        playerName: playerName,
                         worldType,
                     })
 
                     if (!response.ok || !response.room?.id) {
                         const message = response.message ?? "Failed to create room.";
-                        set({ roomErrorMessage: message });
                         return { ok: false, message }
                     }
 
                     applyRoomSnapshot(set, response.room, response.selfPlayerId ?? null);
                     
                     set({
-                        localPlayerName: safePlayerName,
+                        localPlayerName: playerName,
                     });
 
                     const shareableLink = buildRoomShareLink(response.room.id);
@@ -440,9 +432,9 @@ export const useGameStore = create(
                         ok: true,
                         roomId: response.room.id,
                     }
+                    
                 } catch (error) {
                     const message = error instanceof Error ? error.message : "Failed to create room.";
-                    set({ roomErrorMessage: message });
                     return { ok: false, message }
                 }
             },
@@ -453,13 +445,11 @@ export const useGameStore = create(
 
                 if (!safeRoomId) {
                     const message = "Room ID is required.";
-                    set({ roomErrorMessage: message });
                     return { ok: false, message };
                 }
 
                 if (!safePlayerName) {
                     const message = "Name is required.";
-                    set({ roomErrorMessage: message });
                     return { ok: false, message };
                 }
 
@@ -474,7 +464,6 @@ export const useGameStore = create(
 
                     if (!response.ok || !response.room?.id) {
                         const message = response.message ?? "Failed to join room.";
-                        set({ roomErrorMessage: message });
                         return { ok: false, message }
                     }
 
@@ -494,7 +483,6 @@ export const useGameStore = create(
 
                 } catch (error) {
                     const message = error instanceof Error ? error.message : "Failed to join room.";
-                    set({ roomErrorMessage: message });
                     return { ok: false, message };
                 }
             },
@@ -527,7 +515,6 @@ export const useGameStore = create(
                 clearRoomState(set);
 
                 set({
-                    roomErrorMessage: "",
                     localBubbleClearTimeoutId: null,
                 });
             },
@@ -546,9 +533,9 @@ export const useGameStore = create(
 
                     applyRoomSnapshot(set, response.room, get().selfPlayerId);
                     return { ok: true };
+                    
                 } catch (error) {
                     const message = error instanceof Error ? error.message : "Failed to refresh room state.";
-                    set({ roomErrorMessage: message });
                     return { ok: false, message };
                 }
             },
@@ -570,6 +557,11 @@ export const useGameStore = create(
                 }
                 if (activeMessage !== undefined) {
                     payload.activeMessage = String(activeMessage);
+                }
+
+                // if no fields are in the payload (no args provided), don't emit at all
+                if (Object.keys(payload).length === 0) {
+                    return;
                 }
 
                 socket.emit("player:update", payload);
@@ -610,7 +602,6 @@ export const useGameStore = create(
                     const response = await emitWithAck(socket, "chat:send", { text: safeText });
                     if (!response.ok) {
                         const message = response.message ?? "Failed to send message."; 
-                        set({ roomErrorMessage: message });
                         return { ok: false, message }
                     }
 
@@ -630,9 +621,9 @@ export const useGameStore = create(
 
                     set({ localBubbleClearTimeoutId: timeoutId });
                     return { ok: true };
+
                 } catch (error) {
                     const message = error instanceof Error ? error.message : "Failed to send message.";
-                    set({ roomErrorMessage: message });
                     return { ok: false, message };
                 }
             }

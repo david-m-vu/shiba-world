@@ -148,6 +148,7 @@ export const registerSocketHandlers = (io, socket) => {
                 player: result.player,
             });
             acknowledge(callback, { ok: true });
+            
         } catch (error) {
             emitRoomError(socket, callback, error);
         }
