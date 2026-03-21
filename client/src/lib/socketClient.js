@@ -3,7 +3,7 @@ import { io } from "socket.io-client";
 const ACK_TIMEOUT_MS = 6000;
 
 export const createGameSocket = () => {
-    return io(import.meta.env.VITE_SOCKET_SERVER_URL, {
+    return io(import.meta.env.VITE_SERVER_URL, {
         autoConnect: false, // do not immediately open a network connection - connect manually - avoids idle connections on the landing screen
         withCredentials: true, // include credentials like cookies
     })

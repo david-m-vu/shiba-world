@@ -164,7 +164,7 @@ const bindSocketListeners = (set, get, socket) => {
         }
 
         set((state) => {
-            const previousPlayer = state.playersById(incomingPlayer.id);
+            const previousPlayer = state.playersById[incomingPlayer.id];
             return {
                 playersById: {
                     ...state.playersById,
@@ -378,8 +378,6 @@ export const useGameStore = create(
                         roomId: safeRoomId,
                         playerName: safePlayerName,
                     })
-
-                    console.log(response);
 
                     if (!response.ok || !response.room?.id) {
                         const message = response.message ?? "Failed to join room.";

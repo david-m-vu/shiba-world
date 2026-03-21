@@ -12,6 +12,7 @@ import morgan from "morgan";
 import { Server } from "socket.io";
 
 import { registerSocketHandlers } from "./socket/handlers.js";
+import { roomExists } from "./world/rooms.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
 const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS ?? "http://localhost:5173")
@@ -49,6 +50,25 @@ app.get("/health", (_request, response) => {
     response.json({
         ok: true,
         service: "shiba-world-server",
+    });
+});
+
+app.get("/api/rooms/:roomId/exists", (request, response) => {
+    const roomId = String(request.params.roomId ?? "").trim();
+    if (!roomId) {
+        response.status(400).json({
+            ok: false,
+            exists: false,
+            roomId: null,
+            message: "Room ID is required.",
+        });
+        return;
+    }
+
+    response.json({
+        ok: true,
+        exists: roomExists(roomId),
+        roomId,
     });
 });
 

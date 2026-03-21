@@ -6,6 +6,7 @@ import ShibaInuFace from "../assets/shiba-inu.png";
 
 const LandingJoin = () => {
     const [nameInput, setNameInput] = useState("");
+    const [errorMessage, setErrorMessage] = useState("");
     const [pendingAction, setPendingAction] = useState("");
 
     const nameRef = useRef(null);
@@ -28,13 +29,21 @@ const LandingJoin = () => {
             return;
         }
 
-        // TODO: handle nonexistent roomId
-
+        setErrorMessage("");
         setPendingAction("joining");
-        const response = await joinRoom({ roomId, playerName: safePlayerName });
-        console.log(response);
-        console.log(`joining room ${response.roomId}`);
-        setPendingAction("");
+
+        try {
+            const response = await joinRoom({ roomId, playerName: safePlayerName });
+            if (!response.ok) {
+                setErrorMessage(response.message ?? "Failed to join room.");
+                return;
+            }
+
+        } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : "Failed to join room.");
+        } finally { // finally still runs if try or catch returns
+            setPendingAction("");
+        }
     }
     
     return (
@@ -60,7 +69,7 @@ const LandingJoin = () => {
 
                 <hr />
 
-                <form onSubmit={handleSubmit} className="flex flex-col items-center gap-10">
+                <form onSubmit={handleSubmit} className="flex flex-col items-center gap-5">
                     {/* inputs */}
                     <div className="flex flex-col items-center gap-5">
                         <div className="flex flex-col gap-2.5">
@@ -78,8 +87,17 @@ const LandingJoin = () => {
                                 className="min-w-90 bg-white rounded-full py-1 px-4 text-black"
                                 onChange={(e) => {
                                     setNameInput(e.target.value);
+                                    setErrorMessage("");
                                 }}
                             />
+                            <div className="min-h-6">
+                                <p
+                                    aria-live="polite"
+                                    className="text-[#FFA2A2] text-base"
+                                >
+                                    {errorMessage}
+                                </p>
+                            </div>
                         </div>
                     </div>
 

@@ -42,6 +42,15 @@ export const getRoomSnapshot = (roomId) => {
     return room ? serializeRoom(room) : null;
 };
 
+export const roomExists = (roomId) => {
+    const safeRoomId = String(roomId ?? "").trim();
+    if (!safeRoomId) {
+        return false;
+    }
+
+    return rooms.has(safeRoomId);
+}
+
 /**
  * Creates a new room with a generated invite code and registers the given, creating
  * socket as both the room host and the first player.
@@ -101,6 +110,8 @@ export const joinRoom = ({ roomId, socketId, playerName }) => {
     socketToRoomId.set(socketId, roomId);
     touchRoom(room);
 
+    console.log(`${player.name} joined room ${room.id}`)
+
     return {
         player,
         room: serializeRoom(room),
@@ -134,6 +145,8 @@ export const leaveRoom = (socketId) => {
         const nextHost = room.players.keys().next(); // next() returns an object like: { value: ..., done: false }
         room.hostSocketId = nextHost.done ? null : nextHost.value;
     }
+
+    console.log(`player ${socketId} left the room, room size is ${room.players.size}, host is ${room.hostSocketId}`)
 
     if (room.players.size === 0) {
         rooms.delete(roomId);
