@@ -13,7 +13,7 @@ import {
     LANDING_PRIMARY_BUTTON_CLASS,
     LANDING_SECONDARY_BUTTON_CLASS,
     NameInputField,
-} from "./LandingShared.jsx";
+} from "../components/ui/LandingShared.jsx";
 
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 
@@ -70,7 +70,7 @@ const Landing = () => {
             } catch (error) {
                 setErrorMessage(error instanceof Error ? error.message : "failed to check room existence.");
                 return;
-                
+
             } finally {
                 setPendingAction("");
             }
@@ -87,11 +87,13 @@ const Landing = () => {
         const response = await createRoom({ playerName: safePlayerName, worldType: "default" });
         if (!response.ok) {
             setErrorMessage(response.message);
+            setPendingAction("");
+            return;
         }
 
         setPendingAction("");
+        navigate(`/rooms/${response.roomId}`);
 
-        // TODO: generate a sharable link
     };
 
     const handleSwitchMode = () => {

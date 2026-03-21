@@ -96,8 +96,7 @@ export const joinRoom = ({ roomId, socketId, playerName }) => {
         throw new Error("Room not found.");
     }
 
-    const existingPlayer = room.players.get(socketId);
-    if (existingPlayer) {
+    if (room.players.has(socketId)) {
         return {
             player: existingPlayer,
             room: serializeRoom(room),

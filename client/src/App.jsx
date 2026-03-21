@@ -15,6 +15,7 @@ import Landing from "./ui/Landing.jsx";
 import LandingJoin from "./ui/LandingJoin.jsx";
 import GameOverlay from "./ui/GameOverlay.jsx";
 import ChatPanel from "./ui/ChatPanel.jsx";
+import ToastContainer from "./components/ui/ToastContainer.jsx";
 
 import { useGameStore } from "./store/useGameStore.js";
 import { INITIAL_WORLD_CAMERA_POSITION } from "./constants/playerControls.js";
@@ -86,6 +87,8 @@ const App = () => {
           </Routes>
           
         }
+        
+        <ToastContainer />
       </div>
     
   )

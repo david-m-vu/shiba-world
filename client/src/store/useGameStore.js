@@ -7,6 +7,29 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { createGameSocket, emitWithAck } from "../lib/socketClient.js";
 
+const DEFAULT_TOAST_DURATION_MS = 5000;
+const MAX_ACTIVE_TOASTS = 5;
+let nextToastId = 0;
+
+const createToastId = () => {
+    nextToastId++;
+    return `toast-${nextToastId}`;
+};
+
+const buildRoomShareLink = (roomId) => {
+    const safeRoomId = String(roomId ?? "").trim();
+    if (!safeRoomId) {
+        return "";
+    }
+
+    const roomPath = `/rooms/${safeRoomId}`;
+    if (typeof window === "undefined" || !window.location?.origin) {
+        return roomPath;
+    }
+
+    return `${window.location.origin}${roomPath}`;
+};
+
 const toSafeVector3 = (value, fallback = [0, 0, 0]) => {
     if (!Array.isArray(value) || value.length !== 3) {
         return [...fallback];
@@ -88,11 +111,19 @@ const bindSocketListeners = (set, get, socket) => {
     // the other one is a one-shot promise gate - "wait until this specific connection attempt succeeds or fails before continuing"
     // if a connect event fires, both handlers run
     socket.on("connect", () => {
+        const wasConnected = get().socketConnected;
         set({
             socketConnected: true,
             socketId: socket.id,
             socketErrorMessage: "",
         });
+
+        // avoids noisy UI if state and socket events momentarily get out of sync
+        if (!wasConnected) {
+            get().pushToast("Connected to server", {
+                type: "info"
+            });
+        }
     });
 
     socket.on("disconnect", (reason) => {
@@ -103,6 +134,9 @@ const bindSocketListeners = (set, get, socket) => {
         })
 
         clearRoomState(set);
+        get().pushToast(`Disconnected from server (${reason}).`, {
+            type: "error"
+        });
     })
 
     socket.on("connect_error", (error) => {
@@ -113,20 +147,17 @@ const bindSocketListeners = (set, get, socket) => {
         })
     })
 
-    // TODO: this might not be necessary
-    // socket.on("connected:ready", (payload = {}) => {
-    //     if (payload.socketId) {
-    //         set({ socketId: payload.socketId });
-    //     }
-    // })
-
     socket.on("room:error", (payload = {}) => {
         const message = String(payload.message ?? "Room error.");
         set({ roomErrorMessage: message });
+        get().pushToast(message, {
+            type: "error"
+        });
     })
 
     socket.on("player:joined", (payload = {}) => {
         const player = normalizePlayer(payload.player);
+        const selfPlayerId = get().selfPlayerId;
         if (!player.id) {
             return;
         }
@@ -137,11 +168,18 @@ const bindSocketListeners = (set, get, socket) => {
                 [player.id]: player,
             }
         }))
+
+        if (player.id !== selfPlayerId) {
+            get().pushToast(`${player.name} has joined.`, {
+                type: "info"
+            });
+        }
     })
 
     socket.on("player:left", (payload = {}) => {
         const playerId = String(payload.playerId ?? "");
         const nextHostSocketId = payload.hostSocketId ?? null;
+        const leavingPlayerName = get().playersById[playerId]?.name ?? "A player";
         if (!playerId) {
             return;
         }
@@ -155,6 +193,12 @@ const bindSocketListeners = (set, get, socket) => {
                 playersById: nextPlayersById,
             }
         })
+
+        if (playerId !== get().selfPlayerId) {
+            get().pushToast(`${leavingPlayerName} has left.`, {
+                type: "info"
+            });
+        }
     })
 
     socket.on("player:state", (payload = {}) => {
@@ -227,12 +271,54 @@ export const useGameStore = create(
             socketErrorMessage: "",
             roomErrorMessage: "",
             localBubbleClearTimeoutId: null,
+            toasts: [],
 
             // synced state
             playersById: {},
             messages: [],
-            
 
+            pushToast: (message, { durationMs = DEFAULT_TOAST_DURATION_MS, highlightText = "", type = "info" } = {}) => {
+                const safeMessage = String(message ?? "").trim();
+                const safeHighlightText = String(highlightText ?? "").trim();
+                const parsedDuration = Number(durationMs);
+                const safeDurationMs = Number.isFinite(parsedDuration) && parsedDuration >= 0
+                    ? parsedDuration
+                    : DEFAULT_TOAST_DURATION_MS;
+
+                if (!safeMessage) {
+                    return null;
+                }
+
+                const toast = {
+                    id: createToastId(),
+                    type,
+                    message: safeMessage,
+                    durationMs: safeDurationMs,
+                    highlightText: safeHighlightText,
+                };
+
+                set((state) => ({
+                    toasts: [...state.toasts, toast].slice(-MAX_ACTIVE_TOASTS),
+                }));
+
+                return toast.id;
+            },
+
+            removeToast: (toastId) => {
+                const safeToastId = String(toastId ?? "");
+                if (!safeToastId) {
+                    return;
+                }
+
+                set((state) => ({
+                    toasts: state.toasts.filter((toast) => toast.id !== safeToastId),
+                }));
+            },
+
+            clearToasts: () => {
+                set({ toasts: [] });
+            },
+            
             setCameraLockMode: (cameraLockMode) => {
                 set({ cameraLockMode });
             },
@@ -332,7 +418,7 @@ export const useGameStore = create(
                     })
 
                     if (!response.ok || !response.room?.id) {
-                        const message= response.message ?? "Fao;ed to create room.";
+                        const message = response.message ?? "Failed to create room.";
                         set({ roomErrorMessage: message });
                         return { ok: false, message }
                     }
@@ -341,6 +427,13 @@ export const useGameStore = create(
                     
                     set({
                         localPlayerName: safePlayerName,
+                    });
+
+                    const shareableLink = buildRoomShareLink(response.room.id);
+                    get().pushToast(`Room created! Share this link: ${shareableLink}`, {
+                        type: "success",
+                        durationMs: 10000,
+                        highlightText: shareableLink,
                     });
 
                     return {
@@ -389,6 +482,10 @@ export const useGameStore = create(
                     set({
                         localPlayerName: safePlayerName
                     })
+
+                    get().pushToast(`Joined room ${response.room.id}.`, {
+                        type: "success"
+                    });
 
                     return {
                         ok: true,

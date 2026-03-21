@@ -47,10 +47,6 @@ const emitRoomError = (socket, callback, error) => {
 };
 
 export const registerSocketHandlers = (io, socket) => {
-    // acknowledge that client successfully made a connection to a socket
-    // NOTE: don't rely on this on client to determine whether connection was successful. Instead, use a socket.on("connect")
-    // TODO: this might not be necessary
-    // socket.emit("connection:ready", { socketId: socket.id });
     console.log(`${socket.id} connected`)
 
     // room:create does three things: leaves previous room (if any), creates a new room, and place the creator into it

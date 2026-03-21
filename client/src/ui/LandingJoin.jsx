@@ -8,7 +8,7 @@ import {
     LANDING_PRIMARY_BUTTON_CLASS,
     LANDING_SECONDARY_BUTTON_CLASS,
     NameInputField,
-} from "./LandingShared.jsx";
+} from "../components/ui/LandingShared.jsx";
 
 const LandingJoin = () => {
     const [nameInput, setNameInput] = useState("");
@@ -47,7 +47,7 @@ const LandingJoin = () => {
 
         } catch (error) {
             setErrorMessage(error instanceof Error ? error.message : "Failed to join room.");
-            
+
         } finally {
             setPendingAction("");
         }

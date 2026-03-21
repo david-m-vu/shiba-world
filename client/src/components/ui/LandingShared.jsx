@@ -1,4 +1,4 @@
-import ShibaInuFace from "../assets/shiba-inu.png";
+import ShibaInuFace from "../../assets/shiba-inu.png";
 
 export const LANDING_PRIMARY_BUTTON_CLASS = `py-1.5 px-15 rounded-full bg-primary transition-all duration-100 
     hover:cursor-pointer hover:brightness-110 hover:shadow-[0_8px_20px_rgba(0,0,0,0.25)] 
