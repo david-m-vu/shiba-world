@@ -49,7 +49,9 @@ const emitRoomError = (socket, callback, error) => {
 export const registerSocketHandlers = (io, socket) => {
     // acknowledge that client successfully made a connection to a socket
     // NOTE: don't rely on this on client to determine whether connection was successful. Instead, use a socket.on("connect")
-    socket.emit("connection:ready", { socketId: socket.id });
+    // TODO: this might not be necessary
+    // socket.emit("connection:ready", { socketId: socket.id });
+    console.log(`${socket.id} connected`)
 
     // room:create does three things: leaves previous room (if any), creates a new room, and place the creator into it
     // payload is an object of { playerName, worldType }
@@ -74,6 +76,9 @@ export const registerSocketHandlers = (io, socket) => {
                 selfPlayerId: socket.id,
                 room: createdRoomObj.room, // room object
             };
+
+            console.log(`${socket.id} created a room. response:`);
+            console.log(response);
 
             acknowledge(callback, response);
 
@@ -172,7 +177,7 @@ export const registerSocketHandlers = (io, socket) => {
             // redundant if client is happy to treat receipt of chat:message emit above as the success signal
             // but I think we should keep it because its explicit success/failure handling
             acknowledge(callback, { ok: true, message: result.message });
-            
+
         } catch (error) {
             emitRoomError(socket, callback, error);
         }
@@ -181,5 +186,8 @@ export const registerSocketHandlers = (io, socket) => {
     socket.on("disconnect", () => {
         const departureObj = leaveRoom(socket.id);
         emitDeparture(io, socket, departureObj);
+
+        console.log(`${socket.id} disconnected`)
+        console.log("left room:", departureObj);
     });
 };

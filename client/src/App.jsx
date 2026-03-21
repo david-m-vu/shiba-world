@@ -2,8 +2,9 @@
  * This file renders WorldShell on the R3F canvas
  */
 
-import { useEffect } from "react";
-import { Suspense } from 'react';
+import { useEffect, Suspense } from "react";
+import { Routes, Route } from "react-router-dom";
+
 import { Canvas } from "@react-three/fiber"
 import { ACESFilmicToneMapping } from "three";
 import { Physics } from "@react-three/rapier";
@@ -11,14 +12,16 @@ import WorldShell from "./scenes/WorldShell.jsx";
 import LandingPresentationLayer from "./scenes/LandingPresentationLayer.jsx";
 import SharedEnvironment from "./scenes/SharedEnvironment.jsx";
 import Landing from "./ui/Landing.jsx";
+import LandingJoin from "./ui/LandingJoin.jsx";
 import GameOverlay from "./ui/GameOverlay.jsx";
+import ChatPanel from "./ui/ChatPanel.jsx";
 
 import { useGameStore } from "./store/useGameStore.js";
 import { INITIAL_WORLD_CAMERA_POSITION } from "./constants/playerControls.js";
 
 const App = () => {
   const cameraLockMode = useGameStore((state) => state.cameraLockMode);
-  const hasCreatedRoom = useGameStore((state) => state.hasCreatedRoom);
+  const isInRoom = useGameStore((state) => Boolean(state.currentRoomId));
   const sunsetMode = useGameStore((state) => state.sunsetMode);
   const shadowsEnabled = useGameStore((state) => state.shadowsEnabled);
   const debugModeEnabled = useGameStore((state) => state.debugModeEnabled);
@@ -46,7 +49,7 @@ const App = () => {
   }, [setCameraLockMode]);
 
   return (
-      <div className={`relative w-full h-full ${hasCreatedRoom && cameraLockMode ? "cursor-none" : ""}`}>
+      <div className={`relative w-full h-full ${isInRoom && cameraLockMode ? "cursor-none" : ""}`}>
         <Canvas 
           shadows={shadowsEnabled}
           className="w-full h-full"
@@ -65,13 +68,24 @@ const App = () => {
                 useOceanShaders={false}
                 shadowsEnabled={shadowsEnabled}
               />
-              {hasCreatedRoom ? <WorldShell /> : <LandingPresentationLayer />}
+              {isInRoom ? <WorldShell /> : <LandingPresentationLayer />}
             </Physics>
           </Suspense>
 
         </Canvas>
         
-        {hasCreatedRoom ? <GameOverlay /> : <Landing />}
+        {isInRoom ? 
+          <>  
+            <GameOverlay />
+            <ChatPanel />
+          </>
+          : 
+          <Routes>
+            <Route path="/" element={<Landing/> } />
+            <Route path="/rooms/:roomId" element={<LandingJoin/>} />
+          </Routes>
+          
+        }
       </div>
     
   )

@@ -1,5 +1,5 @@
 /**
- * Landing-only 3D presentation layer (camera movement), rendered on top of SharedEnvironment.
+ * Landing-only 3D presentation layer (camera movement), rendered along with SharedEnvironment in App.jsx.
  */
 
 import { useEffect, useRef } from "react";

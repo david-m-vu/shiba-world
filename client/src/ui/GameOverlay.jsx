@@ -169,8 +169,8 @@ const GameOverlay = () => {
                     {/* Help dropdown */}
                     <div
                         aria-hidden={!isHelpEnabled}
-                        className={`flex flex-col absolute px-5 py-4 left-0 gap-1.5 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all duration-200 ease-out 
-                            ${isHelpEnabled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"}`}
+                        className={`flex flex-col absolute px-5 py-4 left-0 gap-1 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all duration-200 ease-out 
+                            ${isHelpEnabled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer -events-none"}`}
                     >
                         <h1 className="text-[1rem] text-center">Controls</h1>
                         <hr />
@@ -237,7 +237,7 @@ const GameOverlay = () => {
                 {/* Settings dropdown */}
                  <div
                     aria-hidden={!isSettingsEnabled}
-                    className={`flex flex-col absolute p-5 right-0 gap-4 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.9)] rounded-2xl transition-all duration-200 ease-out 
+                    className={`flex flex-col absolute p-5 right-0 gap-4 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all duration-200 ease-out 
                         ${isSettingsEnabled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"}`}
                 >
                     {/* Toggles */}

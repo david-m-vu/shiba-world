@@ -10,11 +10,6 @@ const clampString = (value, maxLength) => {
     return String(value ?? "").trim().slice(0, maxLength);
 };
 
-const toFiniteNumber = (value, fallback = 0) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
-};
-
 // expects an array of three values. If value is not an array of three values, then the resulting array = fallback
 // this is to mak esure player state doesn't become undefined, NaN, or wrong-length arrays
 const normalizeVector3 = (value, fallback) => {
@@ -22,7 +17,10 @@ const normalizeVector3 = (value, fallback) => {
         return [...fallback];
     }
 
-    return value.map((entry, index) => toFiniteNumber(entry, fallback[index]));
+    return value.map((entry, index) => {
+        const parsed = Number(entry);
+        return Number.isFinite(parsed) ? parsed : fallback[index];
+    });
 };
 
 export const sanitizePlayerName = (value) => {
@@ -35,7 +33,7 @@ export const sanitizeChatMessage = (value) => {
 
 export const createPlayer = ({ id, name, position, rotation }) => {
     const safeName = sanitizePlayerName(name);
-    if (!safeName) {
+    if (!safeName) { // TODO: does this get caught?
         throw new Error("Player name is required.");
     }
 
