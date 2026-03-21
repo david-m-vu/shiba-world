@@ -7,7 +7,13 @@ import { useRef, useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 
 import { useGameStore } from "../store/useGameStore.js";
-import ShibaInuFace from "../assets/shiba-inu.png";
+import {
+    ErrorMessageRow,
+    LandingShell,
+    LANDING_PRIMARY_BUTTON_CLASS,
+    LANDING_SECONDARY_BUTTON_CLASS,
+    NameInputField,
+} from "./LandingShared.jsx";
 
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 
@@ -19,7 +25,7 @@ const Landing = () => {
 
     const nameRef = useRef(null);
     const roomCodeRef = useRef(null);
-    
+
     const createRoom = useGameStore((state) => state.createRoom);
     const [searchParams, setSearchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -35,7 +41,7 @@ const Landing = () => {
         } else {
             roomCodeRef.current?.focus();
         }
-    }, [isJoinMode])
+    }, [isJoinMode]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -54,14 +60,17 @@ const Landing = () => {
                 if (!responseJson.ok) {
                     setErrorMessage(responseJson.message);
                     return;
-                } else if (!responseJson.exists) { // if room doesnt exist
-                    setErrorMessage(`room code not found.`);
+                }
+
+                if (!responseJson.exists) {
+                    setErrorMessage("room code not found.");
                     return;
-                }   
+                }
 
             } catch (error) {
                 setErrorMessage(error instanceof Error ? error.message : "failed to check room existence.");
                 return;
+                
             } finally {
                 setPendingAction("");
             }
@@ -70,7 +79,6 @@ const Landing = () => {
             return;
         }
 
-        // create mode
         if (!safePlayerName || isBusy) {
             return;
         }
@@ -78,14 +86,13 @@ const Landing = () => {
         setPendingAction("creating");
         const response = await createRoom({ playerName: safePlayerName, worldType: "default" });
         if (!response.ok) {
-            setErrorMessage(response.message)
+            setErrorMessage(response.message);
         }
-        
+
         setPendingAction("");
 
         // TODO: generate a sharable link
-
-    }
+    };
 
     const handleSwitchMode = () => {
         setErrorMessage("");
@@ -94,156 +101,104 @@ const Landing = () => {
             const mode = curSearchParams.get("mode");
 
             if (!mode || mode !== "join") {
-                curSearchParams.set("mode", 'join');
+                curSearchParams.set("mode", "join");
             } else {
                 // set to create mode
                 curSearchParams.delete("mode");
             }
-            
+
             return curSearchParams;
-        })
+        });
     };
 
     return (
-        <div className="absolute inset-0 flex flex-col justify-center items-center gap-6">
-            {/* Title */}
-            <div className="flex flex-row gap-2.5 px-5 py-2.5 justify-center items-center bg-[rgba(246,166,81,0.7)] rounded-4xl">
-                <img src={ShibaInuFace} alt="Shiba Inu face" />
-                <h1 className="text-[4rem]">SHIBA_WORLD</h1>
-            </div>
-
-            {/* Main card */}
-            <div className="text-2xl text-center flex flex-col gap-5 px-10 py-10 bg-[rgba(29,29,29,0.7)] rounded-xl w-[clamp(375px,46rem,90vw)]">
-                {isJoinMode ?
+        <LandingShell
+            headerContent={
+                isJoinMode ? (
                     <p>join a room</p>
-                    :
+                ) : (
                     <p>create rooms, hang out, chat, and watch videos together in real time inside a virtual 3D world - no download required!</p>
-                }
-                
-
-                <hr />
-
-                <form onSubmit={handleSubmit} className="flex flex-col items-center gap-5">
-                    {/* <div className="flex flex-col gap-3"> */}
-                        {/* inputs */}
-                        <div className="flex flex-col items-center gap-5">
-                            {!isJoinMode ?
-                                <div className="flex flex-col gap-2.5">
-                                    <label htmlFor="name">what&apos;s your name?</label>
-                                    <input 
-                                        ref={nameRef}
-                                        autoComplete="off"
-                                        type="text" 
-                                        name="name" 
-                                        id="name" 
-                                        placeholder="enter name..."
-                                        value={nameInput}
-                                        required
-                                        aria-invalid={safePlayerName === ""}
-                                        className="min-w-90 bg-white rounded-full py-1 px-4 text-black"
-                                        onChange={(e) => {
-                                            setNameInput(e.target.value);
-                                            setErrorMessage("");
-                                        }}
-                                    />
-                                </div>
-                                :
-                                <div className="flex flex-col gap-2.5">
-                                    <label htmlFor="room-code">room code</label>
-                                    <input 
-                                        ref={roomCodeRef}
-                                        autoComplete="off"
-                                        type="text" 
-                                        name="room-code" 
-                                        id="room-code" 
-                                        placeholder="enter room code..."
-                                        value={roomCodeInput}
-                                        required
-                                        aria-invalid={safeRoomCode === ""}
-                                        className="min-w-90 bg-white rounded-full py-1 px-4 text-black"
-                                        onChange={(e) => {
-                                            setRoomCodeInput(e.target.value);
-                                            setErrorMessage("");
-                                        }}
-                                    />
-                                    <div className="min-h-6">
-                                        <p
-                                            aria-live="polite"
-                                            className="text-[#FFA2A2] text-base"
-                                        >
-                                            {errorMessage}
-                                        </p>
-                                    </div>
-                                </div>
-                            }
-                            
-                            {!isJoinMode && 
-                                <div className="flex flex-col items-center gap-5">
-                                    <div className="flex flex-col gap-2.5">
-                                        <p>choose a world type:</p>
-                                        <p className="text-[#A6A6A6]">(more worlds to be implemented)</p>
-                                        <div className="min-h-6">
-                                            <p
-                                                aria-live="polite"
-                                                className="text-[#FFA2A2] text-base"
-                                            >
-                                                {errorMessage}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            }
-                        </div>
-
-                        {/* buttons */}
+                )
+            }
+        >
+            <form onSubmit={handleSubmit} className="flex flex-col items-center gap-5">
+                {/* inputs */}
+                <div className="flex flex-col items-center gap-5">
+                    {!isJoinMode ? (
+                        <NameInputField
+                            inputRef={nameRef}
+                            value={nameInput}
+                            isInvalid={safePlayerName === ""}
+                            onChange={(e) => {
+                                setNameInput(e.target.value);
+                                setErrorMessage("");
+                            }}
+                        />
+                    ) : (
                         <div className="flex flex-col gap-2.5">
-                            {isJoinMode ?
-                                <button
-                                    type="submit"
-                                    disabled={isBusy || safeRoomCode === ""}
-                                    className="py-1.5 px-15 rounded-full bg-primary transition-all duration-100 
-                                        hover:cursor-pointer hover:brightness-110 hover:shadow-[0_8px_20px_rgba(0,0,0,0.25)] 
-                                        active:scale-[0.99] active:brightness-95 active:shadow-[0_4px_10px_rgba(0,0,0,0.2)] 
-                                        disabled:opacity-70 disabled:hover:cursor-default disabled:hover:brightness-100 disabled:hover:shadow-none disabled:active:scale-100 disabled:active:brightness-100 disabled:active:shadow-none"
-                                >
-                                    {pendingAction === "verifying" ? "..." : "next" }
-                                </button>
-                                :
-                                <button 
-                                    type="submit"
-                                    disabled={isBusy || safePlayerName === ""} 
-                                    className="py-1.5 px-15 rounded-full bg-primary transition-all duration-100 
-                                        hover:cursor-pointer hover:brightness-110 hover:shadow-[0_8px_20px_rgba(0,0,0,0.25)] 
-                                        active:scale-[0.99] active:brightness-95 active:shadow-[0_4px_10px_rgba(0,0,0,0.2)] 
-                                        disabled:opacity-70 disabled:hover:cursor-default disabled:hover:brightness-100 disabled:hover:shadow-none disabled:active:scale-100 disabled:active:brightness-100 disabled:active:shadow-none"
-                                >
-                                    {pendingAction === "creating" ? "creating room..." : "create a room"}
-                                </button>
-
-                            }
-
-
-                            <button
-                                type="button"
-                                className="text-primary hover:cursor-pointer underline"
-                                onClick={handleSwitchMode}
-                            >
-                                {isJoinMode ? 
-                                    "or create one..." 
-                                    :
-                                    "or join one..."
-                                }
-                                
-                            </button>
+                            <label htmlFor="room-code">room code</label>
+                            <input
+                                ref={roomCodeRef}
+                                autoComplete="off"
+                                type="text"
+                                name="room-code"
+                                id="room-code"
+                                placeholder="enter room code..."
+                                value={roomCodeInput}
+                                required
+                                aria-invalid={safeRoomCode === ""}
+                                className="min-w-90 bg-white rounded-full py-1 px-4 text-black"
+                                onChange={(e) => {
+                                    setRoomCodeInput(e.target.value);
+                                    setErrorMessage("");
+                                }}
+                            />
+                            <ErrorMessageRow message={errorMessage} />
                         </div>
-                    {/* </div> */}
-                    
-                </form>
-            </div>
+                    )}
 
+                    {!isJoinMode && (
+                        <div className="flex flex-col items-center gap-5">
+                            <div className="flex flex-col gap-2.5">
+                                <p>choose a world type:</p>
+                                <p className="text-[#A6A6A6]">(more worlds to be implemented)</p>
+                                <ErrorMessageRow message={errorMessage} />
+                            </div>
+                        </div>
+                    )}
+                </div>
 
-        </div>
-    )
-}
+                {/* buttons */}
+                <div className="flex flex-col gap-2.5">
+                    {isJoinMode ? (
+                        <button
+                            type="submit"
+                            disabled={isBusy || safeRoomCode === ""}
+                            className={LANDING_PRIMARY_BUTTON_CLASS}
+                        >
+                            {pendingAction === "verifying" ? "..." : "next"}
+                        </button>
+                    ) : (
+                        <button
+                            type="submit"
+                            disabled={isBusy || safePlayerName === ""}
+                            className={LANDING_PRIMARY_BUTTON_CLASS}
+                        >
+                            {pendingAction === "creating" ? "creating room..." : "create a room"}
+                        </button>
+                    )}
+
+                    <button
+                        type="button"
+                        className={LANDING_SECONDARY_BUTTON_CLASS}
+                        onClick={handleSwitchMode}
+                    >
+                        {isJoinMode ? "or create one..." : "or join one..."}
+                    </button>
+                </div>
+            </form>
+        </LandingShell>
+    );
+};
 
 export default Landing;
