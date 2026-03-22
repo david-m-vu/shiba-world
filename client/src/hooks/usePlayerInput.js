@@ -73,7 +73,7 @@ export const usePlayerInput = ({ gl, cameraLockMode }) => {
         };
     }, [gl]);
 
-    // handle mouse move when camera is lockde
+    // handle mouse move when camera is locked
     useEffect(() => {
         const handleMouseMove = (event) => {
             if (!cameraLockMode) {

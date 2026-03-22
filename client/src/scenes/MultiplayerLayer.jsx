@@ -42,6 +42,16 @@ const MultiplayerLayer = () => {
     const infiniteJumpEnabled = useGameStore((state) => state.infiniteJumpEnabled);
     const resetCharacterRequestId = useGameStore((state) => state.resetCharacterRequestId);
     const selfPlayerId = useGameStore((state) => state.selfPlayerId);
+    const localPlayerName = useGameStore((state) => {
+        // prioritize using the server0synced source of truth for player name
+        // localPlayerName is used as a fallback for early frames before self player record exists
+        const selfId = state.selfPlayerId;
+        if (selfId && state.playersById[selfId]?.name) {
+            return state.playersById[selfId].name;
+        }
+
+        return state.localPlayerName || "Anonymous";
+    });
     const sendPlayerUpdate = useGameStore((state) => state.sendPlayerUpdate);
 
     const remotePlayers = useRemotePlayers();
@@ -257,6 +267,7 @@ const MultiplayerLayer = () => {
             <Avatar
                 position={localPlayerInitialPosition}
                 rotation={localPlayerInitialRotation}
+                playerName={localPlayerName}
                 usePhysics
                 rigidBodyRef={localRigidBodyRef}
                 rigidBodyProps={{

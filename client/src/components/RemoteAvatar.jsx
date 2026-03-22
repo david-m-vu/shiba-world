@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Vector3 } from "three";
 import { useFrame } from "@react-three/fiber"
 
@@ -22,6 +22,8 @@ const toSafeYaw = (rotation = [0, 0, 0]) => {
 
 const RemoteAvatar = ({ player }) => {
     const rootRef = useRef(null); // points to Avatar's top-level group. used to imperatively apply smoothed transforms each frame onto Avatar
+    const [initialPosition] = useState(() => [...player.position]); // keep initial group placement stable; useFrame owns subsequent transform updates
+    const [initialRotation] = useState(() => [0, toSafeYaw(player.rotation), 0]); // if player changes, initialPosition and initialRotation do not update. (remember init runs once on mount)
     const targetPositionRef = useRef(new Vector3(...player.position));
     const currentPositionRef = useRef(new Vector3(...player.position));
     const targetYawRef = useRef(toSafeYaw(player.rotation));
@@ -74,8 +76,10 @@ const RemoteAvatar = ({ player }) => {
 
     return (
         <Avatar
-            position={player.position}
-            rotation={[0, toSafeYaw(player.rotation), 0]}
+            position={initialPosition}
+            rotation={initialRotation}
+            usePhysics={false}
+            playerName={player.name}
             groupRef={rootRef}
         />
     );

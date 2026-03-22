@@ -7,6 +7,7 @@ import { useGLTF } from "@react-three/drei";
 import { RigidBody, CapsuleCollider } from "@react-three/rapier";
 
 import { AVATAR_POSITION_OFFSET } from "../constants/playerControls";
+import NameTag from "./NameTag.jsx";
 
 // public/ is served at the app root URL, so client/public/models/shiba/scene.gltf is available at /models/shiba/scene.gltf
 const DOG_URL = "/models/shiba/scene.gltf";
@@ -16,6 +17,9 @@ const Avatar = ({
     rotation = [0, 0, 0],
     scale = 1,
     hidden = false,
+    playerName = "Anonymous",
+    showNameTag = true,
+    nameTagYOffset = 1.8,
     usePhysics = false,
     rigidBodyRef = null,
     rigidBodyProps = {},
@@ -43,6 +47,7 @@ const Avatar = ({
         <group ref={visualRef} visible={!hidden} scale={scale}>
             {/* primitive lets us render a raw three.js object directly - attach this three.js object into the React scene graph */}
             <primitive object={model} position={AVATAR_POSITION_OFFSET} /> 
+            {showNameTag ? <NameTag name={playerName} yOffset={nameTagYOffset} /> : null}
             {/* <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
                 <boxGeometry args={[1, 1, 1]} />
                 <meshStandardMaterial />
@@ -65,6 +70,7 @@ const Avatar = ({
         );
     }
 
+    // for remote avatars
     return (
         <group ref={groupRef} position={position} rotation={rotation}>
             {avatarMesh}
