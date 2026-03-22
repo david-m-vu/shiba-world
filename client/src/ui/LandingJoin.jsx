@@ -63,7 +63,7 @@ const LandingJoin = () => {
                         onClick={() => navigate("/?mode=join")}
                         className="text-base text-[#A6A6A6] underline hover:cursor-pointer"
                     >
-                        wrong room?
+                        join a different room?
                     </button>
                 </div>
             }

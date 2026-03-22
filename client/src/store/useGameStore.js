@@ -178,6 +178,7 @@ const bindSocketListeners = (set, get, socket) => {
 
     socket.on("player:left", (payload = {}) => {
         const playerId = String(payload.playerId ?? "");
+        const prevHostSocketId = get().hostSocketId;
         const nextHostSocketId = payload.hostSocketId ?? null;
         const leavingPlayerName = get().playersById[playerId]?.name ?? "A player";
         if (!playerId) {
@@ -194,8 +195,14 @@ const bindSocketListeners = (set, get, socket) => {
             }
         })
 
+        const nextHostPlayerName = nextHostSocketId ? get().playersById[nextHostSocketId]?.name : "";
+        const didHostChange = prevHostSocketId !== nextHostSocketId;
+        const toastMessage = didHostChange && nextHostPlayerName
+            ? `${leavingPlayerName} has left. ${nextHostPlayerName} is the new host.`
+            : `${leavingPlayerName} has left.`;
+
         if (playerId !== get().selfPlayerId) {
-            get().pushToast(`${leavingPlayerName} has left.`, {
+            get().pushToast(toastMessage, {
                 type: "info"
             });
         }
@@ -432,7 +439,7 @@ export const useGameStore = create(
                         ok: true,
                         roomId: response.room.id,
                     }
-                    
+
                 } catch (error) {
                     const message = error instanceof Error ? error.message : "Failed to create room.";
                     return { ok: false, message }
