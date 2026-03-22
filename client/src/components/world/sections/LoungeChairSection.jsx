@@ -68,6 +68,7 @@ const LoungeChairSection = ({
                                 return (
                                     <LoungeChair
                                         key={`chair-${rowIndex}-${i}`}
+                                        objectId={`lounge-chair-section-${groupIndex}-${rowIndex}-${i}`}
                                         position={[x, 0, 0]}
                                         rotation={[0, facing, 0]}
                                         {...chairProps}

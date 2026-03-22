@@ -1,5 +1,6 @@
 import { anchorOffset } from "../../../lib/util.js"
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
+import { useSyncedObjectState } from "../../../hooks/useSyncedObjectState.js";
 
 const defaultRigidBodyProps = {
     type: "dynamic",
@@ -11,6 +12,7 @@ const defaultRigidBodyProps = {
 
 // Lounge chair with a simple frame + fabric bed + angled backrest
 const LoungeChair = ({
+    objectId = "",
     position = [0, 0, 0],
     rotation = [0, 0, 0],
     scale = 1,
@@ -24,6 +26,7 @@ const LoungeChair = ({
     fabricColor = "#6d7a84",
     ...groupProps
 }) => {
+    const syncedRigidBodyRef = useSyncedObjectState({ objectId });
     const frameWidth = bedSize[0] + frameThickness * 2;
     const frameDepth = bedSize[2] + frameThickness * 2;
     const anchorShift = anchorOffset([frameWidth, 0, frameDepth], anchor);
@@ -45,6 +48,7 @@ const LoungeChair = ({
 
     return (
         <RigidBody 
+            ref={syncedRigidBodyRef}
             position={basePosition} 
             rotation={rotation}
             {...defaultRigidBodyProps}    

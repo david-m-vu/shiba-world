@@ -6,8 +6,80 @@ const rooms = new Map(); // map roomIds to room objects - to get what players ar
 const socketToRoomId = new Map(); // map socketIds to RoomIds - to get what rooms each socket belongs to
 
 const MAX_MESSAGES_PER_ROOM = 50;
+const OBJECT_ID_MAX_LENGTH = 64;
 const ROOM_ID_LENGTH = 8;
 const roomIdGenerator = customAlphabet("abcdefghijkmnopqrstuvwxyz23456789", ROOM_ID_LENGTH); // note that this excludes capital letters
+
+const DEFAULT_OBJECT_POSITION = Object.freeze([0, 0, 0]);
+const DEFAULT_OBJECT_QUATERNION = Object.freeze([0, 0, 0, 1]);
+const DEFAULT_OBJECT_VELOCITY = Object.freeze([0, 0, 0]);
+
+const normalizeVector3 = (value, fallback = DEFAULT_OBJECT_POSITION) => {
+    if (!Array.isArray(value) || value.length !== 3) {
+        return [...fallback];
+    }
+
+    return value.map((entry, index) => {
+        const parsed = Number(entry);
+        return Number.isFinite(parsed) ? parsed : fallback[index];
+    });
+};
+
+const normalizeQuaternion = (value, fallback = DEFAULT_OBJECT_QUATERNION) => {
+    if (!Array.isArray(value) || value.length !== 4) {
+        return [...fallback];
+    }
+
+    const normalized = value.map((entry, index) => {
+        const parsed = Number(entry);
+        return Number.isFinite(parsed) ? parsed : fallback[index];
+    });
+    const length = Math.hypot(normalized[0], normalized[1], normalized[2], normalized[3]);
+
+    // a zero quaternion is invalid for rotation, and this is to avoid dividing by zero
+    if (length < 0.000001) {
+        return [...fallback];
+    }
+
+    return normalized.map((entry) => entry / length);
+};
+
+const sanitizeObjectId = (value) => {
+    // this is to prevent clients from sending huge objectId strings that coudl waste memory in room.objects keys
+    return String(value ?? "").trim().slice(0, OBJECT_ID_MAX_LENGTH);
+};
+
+const createObjectState = ({ id, position, quaternion, linvel, angvel }) => {
+    return {
+        id,
+        position: normalizeVector3(position, DEFAULT_OBJECT_POSITION),
+        quaternion: normalizeQuaternion(quaternion, DEFAULT_OBJECT_QUATERNION),
+        linvel: normalizeVector3(linvel, DEFAULT_OBJECT_VELOCITY), // default to 0 linear velocity in units/s
+        angvel: normalizeVector3(angvel, DEFAULT_OBJECT_VELOCITY), // default to 0 angular velocity around each axis in radians/second
+        updatedAt: new Date().toISOString(),
+    };
+};
+
+const applyObjectState = (objectState, nextState = {}) => {
+    if (nextState.position !== undefined) {
+        objectState.position = normalizeVector3(nextState.position, objectState.position ?? DEFAULT_OBJECT_POSITION);
+    }
+
+    if (nextState.quaternion !== undefined) {
+        objectState.quaternion = normalizeQuaternion(nextState.quaternion, objectState.quaternion ?? DEFAULT_OBJECT_QUATERNION);
+    }
+
+    if (nextState.linvel !== undefined) {
+        objectState.linvel = normalizeVector3(nextState.linvel, objectState.linvel ?? DEFAULT_OBJECT_VELOCITY);
+    }
+
+    if (nextState.angvel !== undefined) {
+        objectState.angvel = normalizeVector3(nextState.angvel, objectState.angvel ?? DEFAULT_OBJECT_VELOCITY);
+    }
+
+    objectState.updatedAt = new Date().toISOString();
+    return objectState;
+};
 
 const createRoomId = () => {
     return roomIdGenerator();
@@ -32,7 +104,8 @@ const serializeRoom = (room) => {
         hostSocketId: room.hostSocketId,
         createdAt: room.createdAt,
         updatedAt: room.updatedAt,
-        players: Array.from(room.players.values()), // player objects
+        players: Array.from(room.players.values()), // room.players is a map of player ids to player objects
+        objects: Array.from(room.objects.values()), // room.objects is a map of physical object ids to physical object objects
         messages: [...room.messages], // copy with spread operator - messages is an array of message objects. Earlier elements are the oldest messages
     };
 };
@@ -73,6 +146,7 @@ export const createRoom = ({ socketId, playerName, worldType = "default" }) => {
         createdAt: now,
         updatedAt: now,
         players: new Map(), // map mapping playerIds (which are socketIds right now) to player objects
+        objects: new Map(), // gets populated only when a client emits object:update
         messages: [], // chat history across allplayers
     };
 
@@ -97,6 +171,7 @@ export const joinRoom = ({ roomId, socketId, playerName }) => {
     }
 
     if (room.players.has(socketId)) {
+        const existingPlayer = room.players.get(socketId);
         return {
             player: existingPlayer,
             room: serializeRoom(room),
@@ -190,6 +265,44 @@ export const updatePlayerState = (socketId, nextState) => {
     return {
         roomId,
         player: { ...player },
+    };
+};
+
+export const updateWorldObjectState = (socketId, nextState = {}) => {
+    const roomId = getRoomIdForSocket(socketId);
+    if (!roomId) {
+        throw new Error("Socket is not assigned to a room.");
+    }
+
+    const room = rooms.get(roomId) ?? null;
+    if (!room) {
+        throw new Error("Room not found.");
+    }
+
+    const objectId = sanitizeObjectId(nextState.objectId);
+    if (!objectId) {
+        throw new Error("Object ID is required.");
+    }
+
+    const existingObject = room.objects.get(objectId);
+    if (!existingObject) { // if the object hasn't been registered yet
+        room.objects.set(objectId, createObjectState({
+            id: objectId,
+            position: nextState.position,
+            quaternion: nextState.quaternion,
+            linvel: nextState.linvel,
+            angvel: nextState.angvel,
+        }));
+    } else { // if the object is already registered
+        applyObjectState(existingObject, nextState);
+    }
+
+    touchRoom(room);
+    const updatedObject = room.objects.get(objectId);
+
+    return {
+        roomId,
+        object: { ...updatedObject },
     };
 };
 

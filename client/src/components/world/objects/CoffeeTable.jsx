@@ -1,5 +1,6 @@
 import { anchorOffset } from "../../../lib/util.js"
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
+import { useSyncedObjectState } from "../../../hooks/useSyncedObjectState.js";
 
 const defaultRigidBodyProps = {
     type: "dynamic",
@@ -11,6 +12,7 @@ const defaultRigidBodyProps = {
 
 // Coffee tables treat y position as the base position
 const CoffeeTable = ({
+    objectId = "",
     position = [0, 0, 0],
     rotation = [0, 0, 0],
     scale = 1,
@@ -22,6 +24,7 @@ const CoffeeTable = ({
     rigidBodyProps = defaultRigidBodyProps,
     ...meshProps
 }) => {
+    const syncedRigidBodyRef = useSyncedObjectState({ objectId });
     const anchorShift = anchorOffset(size, anchor);
     const scaleVec = Array.isArray(scale) ? scale : [scale, scale, scale];
     const basePosition = [
@@ -36,6 +39,7 @@ const CoffeeTable = ({
     ];
     return (
         <RigidBody
+            ref={syncedRigidBodyRef}
             position={basePosition}
             rotation={rotation}
             {...defaultRigidBodyProps}

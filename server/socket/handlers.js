@@ -11,6 +11,7 @@ import {
     joinRoom,
     leaveRoom,
     updatePlayerState,
+    updateWorldObjectState,
 } from "../world/rooms.js";
 
 // this function lets the client know that they just left a room
@@ -149,6 +150,18 @@ export const registerSocketHandlers = (io, socket) => {
             });
             acknowledge(callback, { ok: true });
             
+        } catch (error) {
+            emitRoomError(socket, callback, error);
+        }
+    });
+
+    socket.on("object:update", (payload = {}, callback) => {
+        try {
+            const result = updateWorldObjectState(socket.id, payload);
+            socket.to(result.roomId).emit("object:state", {
+                object: result.object,
+            });
+            acknowledge(callback, { ok: true });
         } catch (error) {
             emitRoomError(socket, callback, error);
         }

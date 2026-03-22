@@ -6,6 +6,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import { createGameSocket, emitWithAck } from "../lib/socketClient.js";
+import { toSafeVector3, toSafeVector4 } from "../lib/util.js";
 
 const DEFAULT_TOAST_DURATION_MS = 5000;
 const MAX_ACTIVE_TOASTS = 5;
@@ -30,17 +31,6 @@ const buildRoomShareLink = (roomId) => {
     return `${window.location.origin}${roomPath}`;
 };
 
-const toSafeVector3 = (value, fallback = [0, 0, 0]) => {
-    if (!Array.isArray(value) || value.length !== 3) {
-        return [...fallback];
-    }
-
-    return value.map((entry, index) => {
-        const parsed = Number(entry);
-        return Number.isFinite(parsed) ? parsed : fallback[index];
-    })
-}
-
 const normalizePlayer = (player = {}) => {
     return {
         id: String(player.id ?? ""),
@@ -51,6 +41,17 @@ const normalizePlayer = (player = {}) => {
         connectedAt: player.connectedAt ?? null,
         updatedAt: player.updatedAt ?? null,
     }
+}
+
+const normalizeObjectState = (objectState = {}) => {
+    return {
+        id: String(objectState.id ?? ""),
+        position: toSafeVector3(objectState.position, [0, 0, 0]),
+        quaternion: toSafeVector4(objectState.quaternion, [0, 0, 0, 1]),
+        linvel: toSafeVector3(objectState.linvel, [0, 0, 0]),
+        angvel: toSafeVector3(objectState.angvel, [0, 0, 0]),
+        updatedAt: objectState.updatedAt ?? null,
+    };
 }
 
 // This function normalizes each player in the players array and spreads them out in an object. 
@@ -71,13 +72,30 @@ const playersToMap = (players = []) => {
     return nextPlayersById;
 }
 
+const objectsToMap = (objects = []) => {
+    const nextObjectsById = {};
+
+    objects.forEach((objectState) => {
+        const normalizedObjectState = normalizeObjectState(objectState);
+        if (!normalizedObjectState.id) {
+            return;
+        }
+
+        nextObjectsById[normalizedObjectState.id] = normalizedObjectState;
+    });
+
+    return nextObjectsById;
+}
+
 const normalizeRoomState = (room = {}) => {
     const playersById = playersToMap(room.players ?? []);
+    const objectsById = objectsToMap(room.objects ?? []);
     
     return {
         id: room.id ?? null,
         hostSocketId: room.hostSocketId ?? null,
         playersById,
+        objectsById,
         messages: Array.isArray(room.messages) ? room.messages : []
     }
 }
@@ -90,6 +108,7 @@ const applyRoomSnapshot = (set, roomSnapshot = {}, selfPlayerId = null) => {
         selfPlayerId,
         hostSocketId: normalizedRoomState.hostSocketId,
         playersById: normalizedRoomState.playersById,
+        objectsById: normalizedRoomState.objectsById,
         messages: normalizedRoomState.messages,
     })
 }
@@ -101,6 +120,7 @@ const clearRoomState = (set) => {
         selfPlayerId: null,
         hostSocketId: null,
         playersById: {},
+        objectsById: {},
         messages: [],
         cameraLockMode: false,
     })
@@ -229,6 +249,26 @@ const bindSocketListeners = (set, get, socket) => {
         })
     })
 
+    socket.on("object:state", (payload = {}) => {
+        const incomingObject = normalizeObjectState(payload.object);
+        if (!incomingObject.id) {
+            return;
+        }
+
+        set((state) => {
+            const previousObject = state.objectsById[incomingObject.id];
+            return {
+                objectsById: {
+                    ...state.objectsById,
+                    [incomingObject.id]: previousObject ? {
+                        ...previousObject,
+                        ...incomingObject,
+                    } : incomingObject,
+                }
+            };
+        });
+    });
+
     socket.on("chat:message", (payload = {}) => {
         const message = payload.message;
         if (!message?.id) {
@@ -281,6 +321,7 @@ export const useGameStore = create(
 
             // synced state
             playersById: {}, // object that maps player IDs to player objects
+            objectsById: {}, // object that maps world object IDs to dynamic object state
             messages: [],
 
             pushToast: (message, { durationMs = DEFAULT_TOAST_DURATION_MS, highlightText = "", type = "info" } = {}) => {
@@ -592,6 +633,33 @@ export const useGameStore = create(
                         }
                     }
                 })
+            },
+
+            sendObjectUpdate: ({ objectId, position, quaternion, linvel, angvel } = {}) => {
+                const socket = get().socket;
+                const selfPlayerId = get().selfPlayerId;
+                const safeObjectId = String(objectId ?? "").trim();
+
+                if (!socket?.connected || !selfPlayerId || !safeObjectId) {
+                    return;
+                }
+
+                const payload = { objectId: safeObjectId };
+
+                if (position !== undefined) {
+                    payload.position = toSafeVector3(position, [0, 0, 0]);
+                }
+                if (quaternion !== undefined) {
+                    payload.quaternion = toSafeVector4(quaternion, [0, 0, 0, 1]);
+                }
+                if (linvel !== undefined) {
+                    payload.linvel = toSafeVector3(linvel, [0, 0, 0]);
+                }
+                if (angvel !== undefined) {
+                    payload.angvel = toSafeVector3(angvel, [0, 0, 0]);
+                }
+
+                socket.emit("object:update", payload);
             },
 
             sendChatMessage: async (text) => {

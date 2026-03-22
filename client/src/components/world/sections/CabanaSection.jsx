@@ -45,7 +45,6 @@ const CabanaSection = ({
         [-halfW + postThickness / 2, postHeight / 2, -halfD + postThickness / 2], // front right
     ];
 
-    const chairOffsetX = width * 0.25;
     const chairOffsetZ = depth * 0.25;
     const couchOffsetX = width * 0.35;
     const couchOffsetZ = depth * 0.1;
@@ -122,9 +121,9 @@ const CabanaSection = ({
             ))}
 
             {/* mix of lounge chairs and couches */}
-            <LoungeChair position={[2, 0, chairOffsetZ]} rotation={[0, 0, 0]} {...chairProps} />
-            <LoungeChair position={[0, 0, chairOffsetZ]} rotation={[0, 0, 0]} {...chairProps} />
-            <LoungeChair position={[-2, 0, chairOffsetZ]} rotation={[0, 0, 0]} {...chairProps} />
+            <LoungeChair objectId="cabana-lounge-chair-0" position={[2, 0, chairOffsetZ]} rotation={[0, 0, 0]} {...chairProps} />
+            <LoungeChair objectId="cabana-lounge-chair-1" position={[0, 0, chairOffsetZ]} rotation={[0, 0, 0]} {...chairProps} />
+            <LoungeChair objectId="cabana-lounge-chair-2" position={[-2, 0, chairOffsetZ]} rotation={[0, 0, 0]} {...chairProps} />
 
             <Couch
                 position={[-couchOffsetX, 0, -(couchOffsetZ + 2)]}
@@ -143,6 +142,7 @@ const CabanaSection = ({
 
             {/* table */}
             <CoffeeTable 
+                objectId="cabana-coffee-table-0"
                 position={[0, 0, -4]} 
                 size={[1.6, 0.3, 5]} 
                 {...tableProps} 

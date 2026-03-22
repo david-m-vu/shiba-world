@@ -9,7 +9,7 @@ import Planter from "../objects/Planter.jsx";
 import Couch from "../objects/Couch.jsx";
 import CoffeeTable from "../objects/CoffeeTable.jsx";
 import { Grass } from "../objects/Grass.jsx";
-import DiningSetSection from "../objects/DiningSet.jsx";
+import DiningSet from "../objects/DiningSet.jsx";
 
 // public/ is served at the app root URL, so client/public/models/shiba/scene.gltf is available at /models/shiba/scene.gltf
 const ANIME_GIRL_URL = "/models/just_a_girl/scene.gltf";
@@ -90,7 +90,7 @@ const LoungeSection = ({
                 plantColor={"#d6c70e"}
             />
 
-            <CoffeeTable size={[3, 0.5, 3]} position={[1, 0, -5]} color={"#BDC5CE"} />
+            <CoffeeTable objectId="lounge-coffee-table-0" size={[3, 0.5, 3]} position={[1, 0, -5]} color={"#BDC5CE"} />
 
             <Planter position={mainPlanter.position} size={mainPlanter.size} hasPlants plantColor={plantColor} />
             <Planter position={[leftSideX, 0, planterRowZ]} size={sidePlanter.size} hasPlants plantColor={plantColor} />
@@ -115,6 +115,7 @@ const LoungeSection = ({
             </group>
 
             <CoffeeTable 
+                objectId="lounge-coffee-table-1"
                 position={[1.25, 0, 5.5]} 
                 color={coffeeTableColor} 
                 rigidBodyProps={{
@@ -122,9 +123,10 @@ const LoungeSection = ({
                 }}
             />
 
-            <DiningSetSection
+            <DiningSet
                 position={[0, 0.01, 10.5]}
                 chairDistance={2.25}
+                objectIdPrefix="lounge-dining-set"
                 tableProps={{
                     topRadius: 1.5,
                     topColor: "#f2f2f0",

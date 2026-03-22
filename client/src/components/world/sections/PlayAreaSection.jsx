@@ -30,11 +30,12 @@ export const PlayAreaSection = ({
             <Grass 
                 size={size}
             />
-            <Soccer />
+            <Soccer objectId="play-area-soccer-0" />
 
             {soccerXZPositions.map(([x, z], index) => 
                 <Soccer 
                     key={`soccer-${index}`}
+                    objectId={`play-area-soccer-${index + 1}`}
                     position={[x, 0, z]}
                     color={soccerColors[index]}
                 />

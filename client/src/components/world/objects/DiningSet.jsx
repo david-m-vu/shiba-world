@@ -8,9 +8,9 @@ const DiningSetSection = ({
     chairCount = 4,
     chairDistance = 2.5,
     chairAngleOffset = Math.PI / 2,
+    objectIdPrefix = "dining-set",
     tableProps = {},
     chairProps = {},
-    showCenterpiece = true,
     ...groupProps
 }) => {
     // const topHeight = tableProps.topHeight ?? 0.76;
@@ -32,6 +32,7 @@ const DiningSetSection = ({
                 return (
                     <Chair
                         key={`dining-chair-${index}`}
+                        objectId={`${objectIdPrefix}-chair-${index}`}
                         position={[x, 0, z]}
                         rotation={[0, lookAtCenterYaw, 0]}
                         {...chairProps}

@@ -1,4 +1,5 @@
 import { BallCollider, RigidBody } from "@react-three/rapier";
+import { useSyncedObjectState } from "../../../hooks/useSyncedObjectState.js";
 
 const defaultRigidBodyProps = {
     type: "dynamic",
@@ -14,6 +15,7 @@ const defaultColliderProps = {
 };
 
 const Soccer = ({
+    objectId = "",
     position = [0, 0, 0],
     rotation = [0, 0, 0],
     scale = 1,
@@ -23,11 +25,13 @@ const Soccer = ({
     colliderProps = {},
     ...meshProps
 }) => {
+    const syncedRigidBodyRef = useSyncedObjectState({ objectId });
     const scaleVec = Array.isArray(scale) ? scale : [scale, scale, scale];
     const effectiveRadius = radius * Math.max(scaleVec[0], scaleVec[1], scaleVec[2]);
 
     return (
         <RigidBody
+            ref={syncedRigidBodyRef}
             position={position}
             rotation={rotation}
             {...defaultRigidBodyProps}

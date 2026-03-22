@@ -1,3 +1,32 @@
+export const toSafeVector3 = (value, fallback = [0, 0, 0]) => {
+    if (!Array.isArray(value) || value.length !== 3) {
+        return [...fallback];
+    }
+
+    return value.map((entry, index) => {
+        const parsed = Number(entry);
+        return Number.isFinite(parsed) ? parsed : fallback[index];
+    })
+}
+
+export const toSafeVector4 = (value, fallback = [0, 0, 0, 1]) => {
+    if (!Array.isArray(value) || value.length !== 4) {
+        return [...fallback];
+    }
+
+    const normalized = value.map((entry, index) => {
+        const parsed = Number(entry);
+        return Number.isFinite(parsed) ? parsed : fallback[index];
+    });
+    const length = Math.hypot(normalized[0], normalized[1], normalized[2], normalized[3]);
+
+    if (length < 0.000001) {
+        return [...fallback];
+    }
+
+    return normalized.map((entry) => entry / length);
+}
+
 export const getShortestAngleDelta = (a, b) => {
     const TWO_PI = Math.PI * 2;
     return (((b - a + Math.PI) % TWO_PI + TWO_PI) % TWO_PI) - Math.PI;

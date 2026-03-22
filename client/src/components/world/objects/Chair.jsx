@@ -1,5 +1,6 @@
 import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import { anchorOffset } from "../../../lib/util.js";
+import { useSyncedObjectState } from "../../../hooks/useSyncedObjectState.js";
 
 const defaultRigidBodyProps = {
     type: "dynamic",
@@ -11,6 +12,7 @@ const defaultRigidBodyProps = {
 
 // Dining chair with a low-profile seat, leaned backrest, and slender angled legs.
 const Chair = ({
+    objectId = "",
     position = [0, 0, 0],
     rotation = [0, 0, 0],
     scale = 1,
@@ -31,6 +33,7 @@ const Chair = ({
     rigidBodyProps = defaultRigidBodyProps,
     ...groupProps
 }) => {
+    const syncedRigidBodyRef = useSyncedObjectState({ objectId });
     const footprintSize = [seatWidth, 0, seatDepth];
     const anchorShift = anchorOffset(footprintSize, anchor);
     const scaleVec = Array.isArray(scale) ? scale : [scale, scale, scale];
@@ -62,6 +65,7 @@ const Chair = ({
 
     return (
         <RigidBody
+            ref={syncedRigidBodyRef}
             position={basePosition}
             rotation={rotation}
             {...rigidBodyProps}
