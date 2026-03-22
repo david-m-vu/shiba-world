@@ -1,3 +1,8 @@
+export const getShortestAngleDelta = (a, b) => {
+    const TWO_PI = Math.PI * 2;
+    return (((b - a + Math.PI) % TWO_PI + TWO_PI) % TWO_PI) - Math.PI;
+};
+
 export const anchorOffset = (size, anchor) => {
     if (!anchor || anchor === "center") {
         return [0, 0, 0];

@@ -20,7 +20,8 @@ const Avatar = ({
     rigidBodyRef = null,
     rigidBodyProps = {},
     colliderProps = {},
-    visualRef = null, // represents the group ref
+    visualRef = null, // represents the group ref - used for hiding avatar if camera is too close
+    groupRef = null, // used for non-physics avatars (for example remote interpolation)
 }) => {
     const { scene } = useGLTF(DOG_URL); // load GLTF file, and also cache result so multiple avatars can reuse the same loaded data
 
@@ -65,7 +66,7 @@ const Avatar = ({
     }
 
     return (
-        <group position={position} rotation={rotation}>
+        <group ref={groupRef} position={position} rotation={rotation}>
             {avatarMesh}
         </group>
     );

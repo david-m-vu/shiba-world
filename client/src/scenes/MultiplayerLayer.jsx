@@ -10,6 +10,8 @@ import { useRapier } from "@react-three/rapier";
 import { Euler, Quaternion } from "three";
 
 import Avatar from "../components/Avatar.jsx";
+import RemoteAvatar from "../components/RemoteAvatar.jsx";
+
 import { useGameStore } from "../store/useGameStore.js";
 import { useRemotePlayers } from "../hooks/useRemotePlayers.js";
 import {
@@ -23,16 +25,14 @@ import { usePlayerMovement } from "../hooks/usePlayerMovement.js";
 import { useThirdPersonCamera } from "../hooks/useThirdPersonCamera.js";
 import { useAvatarRotation } from "../hooks/useAvatarRotation.js";
 
+import { getShortestAngleDelta } from "../lib/util.js";
+
 const LOCAL_PLAYER_DEFAULT_POSITION = [0, 5, 0];
 const LOCAL_PLAYER_DEFAULT_ROTATION = [0, 0, 0];
+
 const PLAYER_SYNC_INTERVAL_MS = 66;
 const PLAYER_SYNC_POSITION_EPSILON = 0.02;
 const PLAYER_SYNC_ROTATION_EPSILON = 0.03;
-
-const getShortestAngleDelta = (a, b) => {
-    const TWO_PI = Math.PI * 2;
-    return (((b - a + Math.PI) % TWO_PI + TWO_PI) % TWO_PI) - Math.PI;
-};
 
 const MultiplayerLayer = () => {
     const { camera, gl } = useThree();
@@ -47,7 +47,7 @@ const MultiplayerLayer = () => {
     const remotePlayers = useRemotePlayers();
 
     const initialLocalStateRef = useRef(null); // useRef to keep it stable for the lifetime of this MultiplayerLayer mount
-    if (!initialLocalStateRef.current) { // initialize initialLocalStateRef
+    if (!initialLocalStateRef.current) { // initialize initialLocalStateRef only once
         const state = useGameStore.getState();
         const selfPlayer = state.selfPlayerId ? state.playersById[state.selfPlayerId] : null;
         initialLocalStateRef.current = {
@@ -277,11 +277,7 @@ const MultiplayerLayer = () => {
             />
 
             {remotePlayers.map((player) => (
-                <Avatar
-                    key={player.id}
-                    position={player.position}
-                    rotation={player.rotation}
-                />
+                <RemoteAvatar key={player.id} player={player} />
             ))}
         </>
     )

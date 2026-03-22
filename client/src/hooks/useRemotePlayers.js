@@ -17,7 +17,7 @@ export const useRemotePlayers = () => {
     return useGameStore(useShallow((state) => {
         const selfPlayerId = state.selfPlayerId;
 
-        // return all the players except for the current player
+        // return all the player objects except for the current player
         return Object.values(state.playersById).filter((player) => {
             return player.id && player.id !== selfPlayerId;
         });
