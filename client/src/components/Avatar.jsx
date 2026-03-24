@@ -8,6 +8,7 @@ import { RigidBody, CapsuleCollider } from "@react-three/rapier";
 
 import { AVATAR_POSITION_OFFSET } from "../constants/playerControls";
 import NameTag from "./NameTag.jsx";
+import SpeechBubble from "./SpeechBubble.jsx";
 
 // public/ is served at the app root URL, so client/public/models/shiba/scene.gltf is available at /models/shiba/scene.gltf
 const DOG_URL = "/models/shiba/scene.gltf";
@@ -18,8 +19,11 @@ const Avatar = ({
     scale = 1,
     hidden = false,
     playerName = "Anonymous",
+    activeMessage = "",
     showNameTag = true,
     nameTagYOffset = 1.8,
+    showSpeechBubble = true,
+    speechBubbleYOffset = 2.02,
     usePhysics = false,
     rigidBodyRef = null,
     rigidBodyProps = {},
@@ -47,6 +51,7 @@ const Avatar = ({
         <group ref={visualRef} visible={!hidden} scale={scale}>
             {/* primitive lets us render a raw three.js object directly - attach this three.js object into the React scene graph */}
             <primitive object={model} position={AVATAR_POSITION_OFFSET} /> 
+            {showSpeechBubble ? <SpeechBubble message={activeMessage} yOffset={speechBubbleYOffset} /> : null}
             {showNameTag ? <NameTag name={playerName} yOffset={nameTagYOffset} /> : null}
             {/* <mesh position={[0, 0.5, 0]} castShadow receiveShadow>
                 <boxGeometry args={[1, 1, 1]} />

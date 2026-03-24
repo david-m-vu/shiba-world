@@ -680,8 +680,6 @@ export const useGameStore = create(
                         return { ok: false, message }
                     }
 
-                    // TODO: set response.message as cur activeMessage for local player?
-
                     // clear previous timeout
                     const previousTimeoutId = get().localBubbleClearTimeoutId;
                     if (previousTimeoutId) {
@@ -692,7 +690,7 @@ export const useGameStore = create(
                     const timeoutId = window.setTimeout(() => {
                         get().sendPlayerUpdate({ activeMessage: "" });
                         set({ localBubbleClearTimeoutId: null });
-                    }, 4500);
+                    }, 5000);
 
                     set({ localBubbleClearTimeoutId: timeoutId });
                     return { ok: true };

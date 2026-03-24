@@ -274,6 +274,10 @@ const GameOverlay = () => {
                             <p className="whitespace-nowrap">interact</p>
                             <p className="text-primary whitespace-nowrap">E</p>
                         </div>
+                        <div className="flex flex-row justify-between gap-4">
+                            <p className="whitespace-nowrap">chat</p>
+                            <p className="text-primary whitespace-nowrap">ENTER / T</p>
+                        </div>
 
                     </div>
                     </div>

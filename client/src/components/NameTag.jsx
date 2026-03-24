@@ -1,29 +1,50 @@
 /**
  * This file renders a nametag relative to an Avatar (three.js)
- * Styles I'm unsure about: border border-white/22, shadow-[0_8px_20px_rgba(2,6,23,0.35)]
  */
-import { Html } from "@react-three/drei";
+import { Billboard, RoundedBox, Text } from "@react-three/drei";
 
 const NameTag = ({ name = "Anonymous", yOffset = 1.45 }) => {
-    const safeName = String(name ?? "").trim() || "Anonymous";
+    const safeName = String(name ?? "").trim().slice(0, 32) || "Anonymous";
+    const plateWidth = Math.max(0.5, Math.min(3, 0.2 + safeName.length * 0.1));
 
     return (
-        <Html
-            position={[0, yOffset, 0]}
-            center // adds a -50%/-50% css transform
-            transform // makes html behave like a real 3d object instead of simple screens-space projection
-            sprite // billboard model for Html - when transform is on, it rotates to face the active camera
-            distanceFactor={10} // children will be scaled by this. bigger value means it appears larger for a given distance (or shrinks less as camera moves away)
-            eps={0.01} // ignore tiny transform deltas to reduce text shimmer
-        >
-            <div
-                className="pointer-events-none select-none max-w-55 overflow-hidden text-ellipsis whitespace-nowrap 
-                    rounded-[5px] border border-white/22 bg-slate-900/20 px-2.5 py-[0.05rem] text-[0.5rem] 
-                    font-semibold leading-[1.2] tracking-[0.01em] text-slate-50 shadow-[0_8px_20px_rgba(2,6,23,0.35)]"
-            >
-                {safeName}
-            </div>
-        </Html>
+        <Billboard position={[0, yOffset, 0]} follow>
+            <group>
+                <mesh position={[0, 0, -0.01]} renderOrder={9}>
+                    <RoundedBox
+                        args={[plateWidth, 0.22, 0.01]}
+                        radius={0.01}
+                        smoothness={100}
+                        position={[0, 0, -0.01]} // push bubble background slightly behind the text to avoid z-fighting
+                        renderOrder={9}
+                    >
+                        <meshBasicMaterial
+                            color="#000000"
+                            transparent
+                            opacity={0.42}
+                            depthWrite={false} // don't block later objects by depth
+                            depthTest={false} // ignores depth comparisons, so it renders even if there is a geometry in front of it
+                            toneMapped={false} // skips renderer tone mapping so color stays exact
+                        />
+                    </RoundedBox>
+
+                </mesh>
+
+                <Text
+                    fontSize={0.15}
+                    maxWidth={2}
+                    anchorX="center"
+                    anchorY="middle"
+                    color="#f8fafc"
+                    material-depthWrite={false}
+                    material-depthTest={false}
+                    material-toneMapped={false}
+                    renderOrder={10}
+                >
+                    {safeName}
+                </Text>
+            </group>
+        </Billboard>
     );
 };
 

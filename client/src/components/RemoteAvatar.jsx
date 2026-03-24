@@ -80,6 +80,7 @@ const RemoteAvatar = ({ player }) => {
             rotation={initialRotation}
             usePhysics={false}
             playerName={player.name}
+            activeMessage={player.activeMessage}
             groupRef={rootRef}
         />
     );

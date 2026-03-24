@@ -1,5 +1,7 @@
 import ShibaInuFace from "../../assets/shiba-inu.png";
 
+const PLAYER_NAME_MAX_LENGTH = 32;
+
 export const LANDING_PRIMARY_BUTTON_CLASS = `py-1.5 px-15 rounded-full bg-primary transition-all duration-100 
     hover:cursor-pointer hover:brightness-110 hover:shadow-[0_8px_20px_rgba(0,0,0,0.25)] 
     active:scale-[0.99] active:brightness-95 active:shadow-[0_4px_10px_rgba(0,0,0,0.2)] 
@@ -38,6 +40,7 @@ export const NameInputField = ({ inputRef, value, isInvalid, onChange }) => {
                 id="name"
                 placeholder="enter name..."
                 value={value}
+                maxLength={PLAYER_NAME_MAX_LENGTH}
                 required
                 aria-invalid={isInvalid}
                 className="min-w-90 bg-white rounded-full py-1 px-4 text-black"

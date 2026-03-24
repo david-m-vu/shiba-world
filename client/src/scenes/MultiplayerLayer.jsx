@@ -52,6 +52,14 @@ const MultiplayerLayer = () => {
 
         return state.localPlayerName || "Anonymous";
     });
+    const localActiveMessage = useGameStore((state) => {
+        const selfId = state.selfPlayerId;
+        if (!selfId) {
+            return "";
+        }
+
+        return String(state.playersById[selfId]?.activeMessage ?? "");
+    });
     const sendPlayerUpdate = useGameStore((state) => state.sendPlayerUpdate);
 
     const remotePlayers = useRemotePlayers();
@@ -268,6 +276,7 @@ const MultiplayerLayer = () => {
                 position={localPlayerInitialPosition}
                 rotation={localPlayerInitialRotation}
                 playerName={localPlayerName}
+                activeMessage={localActiveMessage}
                 usePhysics
                 rigidBodyRef={localRigidBodyRef}
                 rigidBodyProps={{

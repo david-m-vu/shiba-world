@@ -35,10 +35,11 @@ const ChatPanel = () => {
     const pushToast = useGameStore((state) => state.pushToast);
 
     const [draftMessage, setDraftMessage] = useState("");
-    const [isChatHidden, setIsChatHidden] = useState(false);
+    const [isChatHidden, setIsChatHidden] = useState(true);
     const [isSending, setIsSending] = useState(false);
 
     const messagesListRef = useRef(null);
+    const inputRef = useRef(null);
 
     // if # of messages changes, scroll top edge all the way to the size of the container
     useEffect(() => {
@@ -48,6 +49,78 @@ const ChatPanel = () => {
 
         messagesListRef.current.scrollTop = messagesListRef.current.scrollHeight;
     }, [messages.length]);
+
+    useEffect(() => {
+        const isEditableElement = (element) => {
+            if (!(element instanceof HTMLElement)) {
+                return false;
+            }
+
+            if (element.isContentEditable) {
+                return true;
+            }
+
+            const tagName = element.tagName;
+            return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
+        };
+
+        const handleGlobalChatFocusShortcut = (event) => {
+            if (event.key === "Escape" && document.activeElement === inputRef.current) {
+                event.preventDefault();
+                event.stopPropagation();
+                inputRef.current.blur();
+                return;
+            }
+
+            const key = String(event.key ?? "").toLowerCase();
+            const isShortcut = event.key === "Enter" || key === "t";
+            if (!isShortcut) {
+                return;
+            }
+
+            const activeElement = document.activeElement;
+            if (activeElement === inputRef.current) {
+                return;
+            }
+
+            // this is to make it so that pressing enter/t won't hijack typing if we're already in an editable field
+            // but right now, there is no other editable field that gets rendered simultaneously with the chat input
+            if (isEditableElement(activeElement)) {
+                return;
+            }
+
+            // do this after we know we should handle the key input as focusing the chat
+            event.preventDefault();
+            event.stopPropagation();
+            setIsChatHidden(false);
+
+            if (document.pointerLockElement) {
+                try {
+                    document.exitPointerLock();
+                } catch {
+                    // no-op
+                }
+            }
+
+            // wait for next animation frame because we have to wait one paint tick so React can apply setIsChatHidden(false) first
+            // without waiting, we might try to focus the input before it's mounted/visible
+            window.requestAnimationFrame(() => {
+                if (!inputRef.current) {
+                    return;
+                }
+
+                inputRef.current.focus();
+                const valueLength = inputRef.current.value.length;
+                inputRef.current.setSelectionRange(valueLength, valueLength); // set the text cursor/selection at the end of the current message instead of highligting text
+            });
+        };
+
+        // capture phase so the shortcut is handled before bubble listeners on window
+        window.addEventListener("keydown", handleGlobalChatFocusShortcut, true);
+        return () => {
+            window.removeEventListener("keydown", handleGlobalChatFocusShortcut, true);
+        };
+    }, []);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
@@ -137,7 +210,7 @@ const ChatPanel = () => {
                                                 <time className="shrink-0 text-white/60">{messageTime}</time>
                                             ) : null}
                                         </div>
-                                        <p className="wrap-break-word text-sm leading-relaxed text-white/95">
+                                        <p className="wrap-break-word text-sm leading-5 text-white/95">
                                             {safeText}
                                         </p>
                                     </li>
@@ -154,10 +227,11 @@ const ChatPanel = () => {
                     className="flex gap-2 border-t border-white/10 bg-black/20 p-2"
                 >
                     <input
+                        ref={inputRef}
                         type="text"
                         value={draftMessage}
                         maxLength={CHAT_INPUT_MAX_LENGTH}
-                        placeholder="Click here to chat or press ENTER"
+                        placeholder="Click here to chat or press ENTER / T"
                         onChange={(event) => setDraftMessage(event.target.value)}
                         onFocus={(event) => event.stopPropagation()} // so game controls don't react when the user clicks or focus into the chat input
                         onClick={(event) => event.stopPropagation()}
