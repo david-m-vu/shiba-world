@@ -85,6 +85,8 @@ export const registerSocketHandlers = (io, socket) => {
 
             acknowledge(callback, response);
 
+            
+
         } catch (error) {
             emitRoomError(socket, callback, error);
         }
@@ -120,6 +122,8 @@ export const registerSocketHandlers = (io, socket) => {
             acknowledge(callback, response);
 
             if (joinedRoomObj.isNewPlayer) {
+                // to let the existing people in the room know that someone joined in the chat
+                // without this, only the joiner would receive the join system message
                 if (joinedRoomObj.systemMessage) {
                     socket.to(joinedRoomObj.room.id).emit("chat:message", {
                         message: joinedRoomObj.systemMessage,

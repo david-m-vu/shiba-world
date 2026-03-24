@@ -168,6 +168,9 @@ export const createRoom = ({ socketId, playerName, worldType = "default" }) => {
     rooms.set(roomId, newRoom);
     socketToRoomId.set(socketId, roomId);
 
+    const systemMessage = createSystemChatMessage(`${createdPlayer.name} created the room.`)
+    appendRoomMessage(newRoom, systemMessage);
+
     // return info about created room (with created player as sole player)
     return {
         createdPlayer,
@@ -230,6 +233,7 @@ export const leaveRoom = (socketId) => {
     room.players.delete(socketId);
 
     // if the player that just left was the host, transfer host ownership to another player
+    const prevHostSocketId = room.hostSocketId;
     if (room.hostSocketId === socketId) {
         const nextHost = room.players.keys().next(); // next() returns an object like: { value: ..., done: false }
         room.hostSocketId = nextHost.done ? null : nextHost.value;
@@ -249,7 +253,8 @@ export const leaveRoom = (socketId) => {
     }
 
     const nextHostPlayerName = room.hostSocketId ? room.players.get(room.hostSocketId)?.name : "";
-    const statusMessage = nextHostPlayerName
+    const hostChanged = room.hostSocketId !== prevHostSocketId
+    const statusMessage = nextHostPlayerName && hostChanged
         ? `${leavingPlayerName} has left. ${nextHostPlayerName} is the new host.`
         : `${leavingPlayerName} has left.`;
     const leaveSystemMessage = appendRoomMessage(room, createSystemChatMessage(statusMessage));
