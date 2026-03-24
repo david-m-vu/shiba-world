@@ -14,6 +14,52 @@ const DEFAULT_OBJECT_POSITION = Object.freeze([0, 0, 0]);
 const DEFAULT_OBJECT_QUATERNION = Object.freeze([0, 0, 0, 1]);
 const DEFAULT_OBJECT_VELOCITY = Object.freeze([0, 0, 0]);
 
+// note that if we add/change movable world objects later, update this server allowlist to match
+const DEFAULT_WORLD_LOUNGE_CHAIR_GROUP_COUNT = 2;
+const DEFAULT_WORLD_LOUNGE_CHAIR_ROW_COUNT = 2;
+const DEFAULT_WORLD_LOUNGE_CHAIR_COUNT_PER_ROW = 3;
+const DEFAULT_WORLD_PLAY_AREA_SOCCER_COUNT = 5;
+const DEFAULT_WORLD_DINING_CHAIR_COUNT = 4;
+
+const buildDefaultWorldAllowedObjectIds = () => {
+    const allowedObjectIds = new Set([
+        "cabana-coffee-table-0",
+        "cabana-lounge-chair-0",
+        "cabana-lounge-chair-1",
+        "cabana-lounge-chair-2",
+        "lounge-coffee-table-0",
+        "lounge-coffee-table-1",
+    ]);
+
+    for (let index = 0; index < DEFAULT_WORLD_PLAY_AREA_SOCCER_COUNT; index++) {
+        allowedObjectIds.add(`play-area-soccer-${index}`);
+    }
+
+    for (let index = 0; index < DEFAULT_WORLD_DINING_CHAIR_COUNT; index++) {
+        allowedObjectIds.add(`lounge-dining-set-chair-${index}`);
+    }
+
+    for (let groupIndex = 0; groupIndex < DEFAULT_WORLD_LOUNGE_CHAIR_GROUP_COUNT; groupIndex++) {
+        for (let rowIndex = 0; rowIndex < DEFAULT_WORLD_LOUNGE_CHAIR_ROW_COUNT; rowIndex++) {
+            for (let chairIndex = 0; chairIndex < DEFAULT_WORLD_LOUNGE_CHAIR_COUNT_PER_ROW; chairIndex += 1) {
+                allowedObjectIds.add(`lounge-chair-section-${groupIndex}-${rowIndex}-${chairIndex}`);
+            }
+        }
+    }
+
+    return allowedObjectIds;
+};
+
+const ALLOWED_OBJECT_IDS_BY_WORLD_TYPE = {
+    default: buildDefaultWorldAllowedObjectIds(),
+    rooftop: buildDefaultWorldAllowedObjectIds(),
+};
+
+const getAllowedObjectIdsForWorldType = (worldType) => {
+    const safeWorldType = String(worldType ?? "").trim();
+    return ALLOWED_OBJECT_IDS_BY_WORLD_TYPE[safeWorldType] ?? null;
+};
+
 const normalizeVector3 = (value, fallback = DEFAULT_OBJECT_POSITION) => {
     if (!Array.isArray(value) || value.length !== 3) {
         return [...fallback];
@@ -60,21 +106,21 @@ const createObjectState = ({ id, position, quaternion, linvel, angvel }) => {
     };
 };
 
-const applyObjectState = (objectState, nextState = {}) => {
-    if (nextState.position !== undefined) {
-        objectState.position = normalizeVector3(nextState.position, objectState.position ?? DEFAULT_OBJECT_POSITION);
+const applyObjectState = (objectState, nextObjectState = {}) => {
+    if (nextObjectState.position !== undefined) {
+        objectState.position = normalizeVector3(nextObjectState.position, objectState.position ?? DEFAULT_OBJECT_POSITION);
     }
 
-    if (nextState.quaternion !== undefined) {
-        objectState.quaternion = normalizeQuaternion(nextState.quaternion, objectState.quaternion ?? DEFAULT_OBJECT_QUATERNION);
+    if (nextObjectState.quaternion !== undefined) {
+        objectState.quaternion = normalizeQuaternion(nextObjectState.quaternion, objectState.quaternion ?? DEFAULT_OBJECT_QUATERNION);
     }
 
-    if (nextState.linvel !== undefined) {
-        objectState.linvel = normalizeVector3(nextState.linvel, objectState.linvel ?? DEFAULT_OBJECT_VELOCITY);
+    if (nextObjectState.linvel !== undefined) {
+        objectState.linvel = normalizeVector3(nextObjectState.linvel, objectState.linvel ?? DEFAULT_OBJECT_VELOCITY);
     }
 
-    if (nextState.angvel !== undefined) {
-        objectState.angvel = normalizeVector3(nextState.angvel, objectState.angvel ?? DEFAULT_OBJECT_VELOCITY);
+    if (nextObjectState.angvel !== undefined) {
+        objectState.angvel = normalizeVector3(nextObjectState.angvel, objectState.angvel ?? DEFAULT_OBJECT_VELOCITY);
     }
 
     objectState.updatedAt = new Date().toISOString();
@@ -294,7 +340,7 @@ export const updatePlayerState = (socketId, nextState) => {
     };
 };
 
-export const updateWorldObjectState = (socketId, nextState = {}) => {
+export const updateWorldObjectState = (socketId, nextObjectState = {}) => {
     const roomId = getRoomIdForSocket(socketId);
     if (!roomId) {
         throw new Error("Socket is not assigned to a room.");
@@ -305,22 +351,28 @@ export const updateWorldObjectState = (socketId, nextState = {}) => {
         throw new Error("Room not found.");
     }
 
-    const objectId = sanitizeObjectId(nextState.objectId);
+    const objectId = sanitizeObjectId(nextObjectState.objectId);
     if (!objectId) {
         throw new Error("Object ID is required.");
+    }
+
+    // this is so that malicious clients can no longer create arbitrary fake object IDs and grow room.objects unbounded
+    const allowedObjectIds = getAllowedObjectIdsForWorldType(room.worldType);
+    if (!allowedObjectIds || !allowedObjectIds.has(objectId)) {
+        throw new Error(`Object ID "${objectId}" is not allowed for world "${room.worldType}".`);
     }
 
     const existingObject = room.objects.get(objectId);
     if (!existingObject) { // if the object hasn't been registered yet
         room.objects.set(objectId, createObjectState({
             id: objectId,
-            position: nextState.position,
-            quaternion: nextState.quaternion,
-            linvel: nextState.linvel,
-            angvel: nextState.angvel,
+            position: nextObjectState.position,
+            quaternion: nextObjectState.quaternion,
+            linvel: nextObjectState.linvel,
+            angvel: nextObjectState.angvel,
         }));
     } else { // if the object is already registered
-        applyObjectState(existingObject, nextState);
+        applyObjectState(existingObject, nextObjectState);
     }
 
     touchRoom(room);

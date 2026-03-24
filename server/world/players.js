@@ -33,7 +33,7 @@ export const sanitizeChatMessage = (value) => {
 
 export const createPlayer = ({ id, name, position, rotation }) => {
     const safeName = sanitizePlayerName(name);
-    if (!safeName) { // TODO: does this get caught?
+    if (!safeName) { 
         throw new Error("Player name is required.");
     }
 
