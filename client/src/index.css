@@ -39,6 +39,26 @@ body,
   margin: 0;
 }
 
+.chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent; /* Firefox */
+}
+
+/* whole scrollbar area */
+.chat-scroll::-webkit-scrollbar { 
+  width: 10px;
+}
+
+/* backgroudn track */
+.chat-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* moving handle */
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 9999px;
+}
 
 @media (prefers-color-scheme: light) {
   :root {

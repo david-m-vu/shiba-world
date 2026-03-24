@@ -4,6 +4,7 @@ import { Stats } from "@react-three/drei";
 
 import Crosshair from "../components/ui/Crosshair.jsx";
 import { useGameStore } from "../store/useGameStore.js";
+import ChatPanel from "./ChatPanel.jsx";
 
 // ?react is a vite query suffix that tells the svg plug (vite-plugin0svgr) to transform the svg into a React component
 import HelpIcon from "../assets/icons/help_outline.svg?react"; 
@@ -167,9 +168,10 @@ const GameOverlay = () => {
     };
 
     return (
-        <div className="absolute top-0 left-0 right-0 z-50 m-2 flex flex-row justify-between">
-            {/* Left side controls and fps panel anchor */}
-            <div className="inline-flex items-start gap-2.5">
+        <div className="pointer-events-none absolute inset-0 z-50">
+            <div className="absolute top-0 left-0 right-0 m-2 flex flex-row justify-between">
+                {/* Left side controls and fps panel anchor */}
+                <div className="inline-flex items-start gap-2.5">
                 {/* Toggles */}
                 <div className="pointer-events-auto inline-flex flex-row gap-2.5 px-3.5 py-2.5 bg-[rgba(85,85,85,0.8)] rounded-4xl relative">
                     <button
@@ -274,137 +276,137 @@ const GameOverlay = () => {
                         </div>
 
                     </div>
-                </div>
+                    </div>
 
-                {/* Stats - needs parent node because Stats creates a raw DOM node and needs to appear it somewhere. otherwise, would default to document.body */}
-                {/* it does: "const parent = (parentProp && parentProp.current) || document.body; parent.appendChild(stats.dom)" */}
-                <div
-                    ref={statsParentRef}
-                    aria-hidden
-                    className={`pointer-events-auto relative h-12 overflow-hidden transition-[width] duration-150 ${debugModeEnabled ? "w-20" : "w-0"}`}
-                >
-                    {debugModeEnabled ? (
-                        <Stats
-                            parent={statsParentRef}
-                            showPanel={0}
-                            className="absolute! left-0! top-0! right-auto! bottom-auto!"
-                        />
-                    ) : null}
-                </div>
-            </div>
-
-            {/* Right side */}
-            <div className="flex flex-row gap-3">
-                {/* Room code */}
-                <button
-                    type="button"
-                    aria-label="Copy room id"
-                    onClick={handleCopyRoomIdClick}
-                    disabled={!currentRoomId}
-                    className="flex flex-row items-center self-center gap-2.5 rounded-4xl bg-[rgba(85,85,85,0.5)] px-4 py-2.5 transition-colors duration-200
-                        hover:cursor-pointer hover:bg-[rgba(85,85,85,0.8)] focus-visible:bg-[rgba(85,85,85,0.8)] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                    <p>Room <span className="text-primary">{currentRoomId}</span></p>
-                    <CopyIcon className="w-5 h-auto text-white" />
-                </button>
-
-                {/* Settings */}
-                <div className="pointer-events-auto inline-flex bg-[rgba(85,85,85,0.8)] rounded-full relative px-2.5">
-                    <button
-                        type="button"
-                        aria-label="Toggle settings"
-                        aria-pressed={isSettingsEnabled}
-                        onClick={(e) => {
-                            setIsSettingsEnabled((prev) => !prev);
-                            e.currentTarget.blur();
-                        }}
-                        className={TOGGLE_BUTTON_CLASS}
-                    >
-                        <SettingsIcon className={`w-10 h-auto ${isSettingsEnabled ? "text-primary" : "text-white"}`} />
-                    </button>
-
-                    {/* Settings dropdown */}
+                    {/* Stats - needs parent node because Stats creates a raw DOM node and needs to appear it somewhere. otherwise, would default to document.body */}
+                    {/* it does: "const parent = (parentProp && parentProp.current) || document.body; parent.appendChild(stats.dom)" */}
                     <div
-                        aria-hidden={!isSettingsEnabled}
-                        className={`flex flex-col absolute p-5 right-0 gap-4 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all duration-200 ease-out 
-                            ${isSettingsEnabled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"}`}
+                        ref={statsParentRef}
+                        aria-hidden
+                        className={`pointer-events-auto relative h-12 overflow-hidden transition-[width] duration-150 ${debugModeEnabled ? "w-20" : "w-0"}`}
                     >
-                        {/* Toggles */}
-                        <div className="flex flex-col gap-1.5">
-                            <div className="flex flex-row justify-between gap-4">
-                                <p className="whitespace-nowrap">(Local) Video Screen Enabled</p>
-                                <ToggleButton
-                                    ariaLabel="Toggle video screen"
-                                    enabled={videoScreenEnabled}
-                                    onToggle={(e) => {
-                                        toggleVideoScreenEnabled();
-                                        e.currentTarget.blur();
-                                    }}
-                                />
-                            </div>
-                            <div className="flex flex-row justify-between gap-4">
-                                <p className="whitespace-nowrap">(Local) Shadows Enabled</p>
-                                <ToggleButton
-                                    ariaLabel="Toggle shadows"
-                                    enabled={shadowsEnabled}
-                                    onToggle={(e) => { 
-                                        toggleShadowsEnabled();
-                                        e.currentTarget.blur();
-                                    }}
-                                />
-                            </div>
-                            <div className="flex flex-row justify-between gap-4">
-                                <p className="whitespace-nowrap">Infinite Jump Enabled</p>
-                                <ToggleButton
-                                    ariaLabel="Toggle infinite jump"
-                                    enabled={infiniteJumpEnabled}
-                                    onToggle={(e) => {
-                                        toggleInfiniteJumpEnabled();
-                                        e.currentTarget.blur();
-                                    }}
-                                />
-                            </div>
-                            <div className="flex flex-row justify-between gap-4">
-                                <p className="whitespace-nowrap">(Local) Debug Mode Enabled</p>
-                                <ToggleButton
-                                    ariaLabel="Toggle debug mode"
-                                    enabled={debugModeEnabled}
-                                    onToggle={(e) => {
-                                        toggleDebugModeEnabled();
-                                        e.currentTarget.blur();
-                                    }}
-                                />
-                            </div>
-                        </div>
-                        
-                        <hr />
-
-                        {/* Buttons */}
-                        <div className="flex flex-col gap-1.5 items-center">
-                            <button
-                                type="button"
-                                className="w-full cursor-pointer rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white transition-opacity duration-150 ease-out hover:opacity-90 active:opacity-80"
-                                onClick={handleResetCharacterClick}
-                            >
-                                Reset Character
-                            </button>
-                            <button
-                                type="button"
-                                className="w-full cursor-pointer rounded-lg border border-red-300/30 bg-red-400/15 px-3 py-1.5 text-sm text-red-100 transition-opacity duration-150 ease-out hover:opacity-90 active:opacity-80"
-                                onClick={handleLeaveRoomClick}
-                            >
-                                Leave Room
-                            </button>
-                        </div>
-
-
-
+                        {debugModeEnabled ? (
+                            <Stats
+                                parent={statsParentRef}
+                                showPanel={0}
+                                className="absolute! left-0! top-0! right-auto! bottom-auto!"
+                            />
+                        ) : null}
                     </div>
                 </div>
+
+                {/* Right side */}
+                <div className="pointer-events-auto flex flex-row gap-3">
+                    {/* Room code */}
+                    <button
+                        type="button"
+                        aria-label="Copy room id"
+                        onClick={handleCopyRoomIdClick}
+                        disabled={!currentRoomId}
+                        className="flex flex-row items-center self-center gap-2.5 rounded-4xl bg-[rgba(85,85,85,0.5)] px-4 py-2.5 transition-colors duration-200
+                            hover:cursor-pointer hover:bg-[rgba(85,85,85,0.8)] focus-visible:bg-[rgba(85,85,85,0.8)] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                        <p>Room <span className="text-primary">{currentRoomId}</span></p>
+                        <CopyIcon className="w-5 h-auto text-white" />
+                    </button>
+
+                    {/* Settings */}
+                    <div className="pointer-events-auto inline-flex bg-[rgba(85,85,85,0.8)] rounded-full relative px-2.5">
+                        <button
+                            type="button"
+                            aria-label="Toggle settings"
+                            aria-pressed={isSettingsEnabled}
+                            onClick={(e) => {
+                                setIsSettingsEnabled((prev) => !prev);
+                                e.currentTarget.blur();
+                            }}
+                            className={TOGGLE_BUTTON_CLASS}
+                        >
+                            <SettingsIcon className={`w-10 h-auto ${isSettingsEnabled ? "text-primary" : "text-white"}`} />
+                        </button>
+
+                        {/* Settings dropdown */}
+                        <div
+                            aria-hidden={!isSettingsEnabled}
+                            className={`flex flex-col absolute p-5 right-0 gap-4 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all duration-200 ease-out 
+                                ${isSettingsEnabled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"}`}
+                        >
+                            {/* Toggles */}
+                            <div className="flex flex-col gap-1.5">
+                                <div className="flex flex-row justify-between gap-4">
+                                    <p className="whitespace-nowrap">(Local) Video Screen Enabled</p>
+                                    <ToggleButton
+                                        ariaLabel="Toggle video screen"
+                                        enabled={videoScreenEnabled}
+                                        onToggle={(e) => {
+                                            toggleVideoScreenEnabled();
+                                            e.currentTarget.blur();
+                                        }}
+                                    />
+                                </div>
+                                <div className="flex flex-row justify-between gap-4">
+                                    <p className="whitespace-nowrap">(Local) Shadows Enabled</p>
+                                    <ToggleButton
+                                        ariaLabel="Toggle shadows"
+                                        enabled={shadowsEnabled}
+                                        onToggle={(e) => { 
+                                            toggleShadowsEnabled();
+                                            e.currentTarget.blur();
+                                        }}
+                                    />
+                                </div>
+                                <div className="flex flex-row justify-between gap-4">
+                                    <p className="whitespace-nowrap">Infinite Jump Enabled</p>
+                                    <ToggleButton
+                                        ariaLabel="Toggle infinite jump"
+                                        enabled={infiniteJumpEnabled}
+                                        onToggle={(e) => {
+                                            toggleInfiniteJumpEnabled();
+                                            e.currentTarget.blur();
+                                        }}
+                                    />
+                                </div>
+                                <div className="flex flex-row justify-between gap-4">
+                                    <p className="whitespace-nowrap">(Local) Debug Mode Enabled</p>
+                                    <ToggleButton
+                                        ariaLabel="Toggle debug mode"
+                                        enabled={debugModeEnabled}
+                                        onToggle={(e) => {
+                                            toggleDebugModeEnabled();
+                                            e.currentTarget.blur();
+                                        }}
+                                    />
+                                </div>
+                            </div>
+                            
+                            <hr />
+
+                            {/* Buttons */}
+                            <div className="flex flex-col gap-1.5 items-center">
+                                <button
+                                    type="button"
+                                    className="w-full cursor-pointer rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white transition-opacity duration-150 ease-out hover:opacity-90 active:opacity-80"
+                                    onClick={handleResetCharacterClick}
+                                >
+                                    Reset Character
+                                </button>
+                                <button
+                                    type="button"
+                                    className="w-full cursor-pointer rounded-lg border border-red-300/30 bg-red-400/15 px-3 py-1.5 text-sm text-red-100 transition-opacity duration-150 ease-out hover:opacity-90 active:opacity-80"
+                                    onClick={handleLeaveRoomClick}
+                                >
+                                    Leave Room
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                { cameraLockMode && <Crosshair /> }
             </div>
 
-            { cameraLockMode && <Crosshair /> }
-            
+            <ChatPanel />
         </div>
     )
 }

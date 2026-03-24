@@ -14,7 +14,6 @@ import SharedEnvironment from "./scenes/SharedEnvironment.jsx";
 import Landing from "./ui/Landing.jsx";
 import LandingJoin from "./ui/LandingJoin.jsx";
 import GameOverlay from "./ui/GameOverlay.jsx";
-import ChatPanel from "./ui/ChatPanel.jsx";
 import ToastContainer from "./components/ui/ToastContainer.jsx";
 
 import { useGameStore } from "./store/useGameStore.js";
@@ -78,7 +77,6 @@ const App = () => {
         {isInRoom ? 
           <>  
             <GameOverlay />
-            <ChatPanel />
           </>
           : 
           <Routes>
