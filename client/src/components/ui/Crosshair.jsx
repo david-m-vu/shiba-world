@@ -1,4 +1,4 @@
-import ShibaIcon from "../../assets/icons/shiba-icon2.png";
+import ShibaIcon from "../../assets/icons/shiba-icon.png";
 
 const Crosshair = () => {
     return (

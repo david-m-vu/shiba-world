@@ -13,7 +13,6 @@ const MAX_ACTIVE_TOASTS = 5;
 const MAX_MESSAGES_PER_ROOM = 50;
 
 let nextToastId = 0;
-let nextLocalSystemMessageId = 0;
 
 const createToastId = () => {
     nextToastId++;
@@ -129,22 +128,6 @@ const appendMessage = (messages = [], nextMessage) => {
     return [...messages, normalizedMessage].slice(-MAX_MESSAGES_PER_ROOM);
 };
 
-const createSystemMessage = (text) => {
-    const safeText = String(text ?? "").trim();
-    if (!safeText) {
-        return null;
-    }
-
-    nextLocalSystemMessageId++;
-
-    return {
-        id: `system-${Date.now()}-${nextLocalSystemMessageId}`,
-        text: safeText,
-        createdAt: new Date().toISOString(),
-        type: "system",
-    };
-};
-
 const applyRoomSnapshot = (set, roomSnapshot = {}, selfPlayerId = null) => {
     const normalizedRoomState = normalizeRoomState(roomSnapshot);
 
@@ -227,16 +210,11 @@ const bindSocketListeners = (set, get, socket) => {
             return;
         }
 
-        const joinSystemMessage = createSystemMessage(`${player.name} has joined.`);
-
         set((state) => ({
             playersById: {
                 ...state.playersById,
                 [player.id]: player,
             },
-            messages: joinSystemMessage
-                ? appendMessage(state.messages, joinSystemMessage)
-                : state.messages,
         }))
 
         if (player.id !== selfPlayerId) {
@@ -250,20 +228,15 @@ const bindSocketListeners = (set, get, socket) => {
         const playerId = String(payload.playerId ?? "");
         const prevHostSocketId = get().hostSocketId;
         const nextHostSocketId = payload.hostSocketId ?? null;
-        
+
         const currentPlayersById = get().playersById;
         const leavingPlayerName = currentPlayersById[playerId]?.name ?? "A player";
         const nextHostPlayerName = nextHostSocketId ? currentPlayersById[nextHostSocketId]?.name : "";
         const didHostChange = prevHostSocketId !== nextHostSocketId;
-        const statusMessage = didHostChange && nextHostPlayerName
-            ? `${leavingPlayerName} has left. ${nextHostPlayerName} is the new host.`
-            : `${leavingPlayerName} has left.`;
 
         if (!playerId) {
             return;
         }
-
-        const leaveSystemMessage = createSystemMessage(statusMessage);
 
         set((state) => {
             const nextPlayersById = { ...state.playersById }; // need to copy because zustand state should be treated as immutable
@@ -272,9 +245,6 @@ const bindSocketListeners = (set, get, socket) => {
             return {
                 hostSocketId: nextHostSocketId,
                 playersById: nextPlayersById,
-                messages: leaveSystemMessage
-                    ? appendMessage(state.messages, leaveSystemMessage)
-                    : state.messages,
             }
         })
 

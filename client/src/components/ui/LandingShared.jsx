@@ -1,4 +1,4 @@
-import ShibaInuFace from "../../assets/shiba-inu.png";
+import ShibaInuFace from "../../assets/icons/shiba-inu.png";
 
 const PLAYER_NAME_MAX_LENGTH = 32;
 
