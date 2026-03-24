@@ -81,6 +81,7 @@ export const createChatMessage = ({ playerId, playerName, text }) => {
         playerName,
         text: safeText,
         createdAt: new Date().toISOString(),
+        type: "chat",
     };
 };
 
