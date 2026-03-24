@@ -7,6 +7,8 @@ import { useGameStore } from "../store/useGameStore.js";
 
 import ExpandIcon from "../assets/icons/expand_less.svg?react";
 import SendIcon from "../assets/icons/send.svg?react";
+import ShibaIcon from "../assets/icons/shiba-icon.png"
+import ShibaInuFace from "../assets/icons/shiba-inu.png";
 
 const CHAT_INPUT_MAX_LENGTH = 240;
 
@@ -252,6 +254,7 @@ const ChatPanel = () => {
                                             className="flex items-start gap-2 rounded-lg border border-amber-300/45 bg-amber-500/15 px-2.5 py-1 text-sm
                                                 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/70"
                                         >
+                                            <img className="w-4 h-auto self-center" src={ShibaInuFace} alt="System message icon" />
                                             {/* <span className="shrink-0 tracking-[0.08em] text-amber-100">SYSTEM:</span> */}
                                             <p className="min-w-0 flex-1 wrap-break-word line-clamp-2 italic leading-5 text-amber-100">
                                                 {safeText}

@@ -32,6 +32,12 @@ const emitDeparture = (io, socket, departureObj) => {
         playerId: departureObj.removedPlayerId,
         hostSocketId: departureObj.nextHostSocketId,
     });
+
+    if (departureObj.systemMessage) {
+        io.to(departureObj.roomId).emit("chat:message", {
+            message: departureObj.systemMessage,
+        });
+    }
 };
 
 // send respones back to client through the callback
@@ -114,6 +120,12 @@ export const registerSocketHandlers = (io, socket) => {
             acknowledge(callback, response);
 
             if (joinedRoomObj.isNewPlayer) {
+                if (joinedRoomObj.systemMessage) {
+                    socket.to(joinedRoomObj.room.id).emit("chat:message", {
+                        message: joinedRoomObj.systemMessage,
+                    });
+                }
+
                 // note we use socket.to(room) instead of io.to(room) because the client socket that triggered this event already received the ack
                 socket.to(joinedRoomObj.room.id).emit("player:joined", {
                     player: joinedRoomObj.player,

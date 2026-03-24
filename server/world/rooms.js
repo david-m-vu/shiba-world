@@ -1,6 +1,6 @@
 import { customAlphabet } from "nanoid";
 
-import { applyPlayerState, createChatMessage, createPlayer } from "./players.js";
+import { applyPlayerState, createChatMessage, createPlayer, createSystemChatMessage } from "./players.js";
 
 const rooms = new Map(); // map roomIds to room objects - to get what players are in each room + additional metadata
 const socketToRoomId = new Map(); // map socketIds to RoomIds - to get what rooms each socket belongs to
@@ -96,6 +96,18 @@ const touchRoom = (room) => {
     return room;
 };
 
+const appendRoomMessage = (room, messageObj) => {
+    room.messages.push(messageObj);
+
+    // only maintain the last 50 messages in the room
+    if (room.messages.length > MAX_MESSAGES_PER_ROOM) {
+        room.messages.shift();
+    }
+
+    touchRoom(room);
+    return messageObj;
+};
+
 // make the room object able to be converted to a valid JSON
 const serializeRoom = (room) => {
     return {
@@ -182,12 +194,13 @@ export const joinRoom = ({ roomId, socketId, playerName }) => {
     const player = createPlayer({ id: socketId, name: playerName });
     room.players.set(socketId, player);
     socketToRoomId.set(socketId, roomId);
-    touchRoom(room);
+    const joinSystemMessage = appendRoomMessage(room, createSystemChatMessage(`${player.name} has joined.`));
 
     console.log(`${player.name} joined room ${room.id}`)
 
     return {
         player,
+        systemMessage: joinSystemMessage,
         room: serializeRoom(room),
         isNewPlayer: true,
     };
@@ -211,6 +224,8 @@ export const leaveRoom = (socketId) => {
         };
     }
 
+    const leavingPlayerName = room.players.get(socketId)?.name ?? "A player";
+
     // delete the current socket from the room's players
     room.players.delete(socketId);
 
@@ -229,10 +244,15 @@ export const leaveRoom = (socketId) => {
             roomDeleted: true,
             removedPlayerId: socketId,
             nextHostSocketId: null,
+            systemMessage: null,
         };
     }
 
-    touchRoom(room);
+    const nextHostPlayerName = room.hostSocketId ? room.players.get(room.hostSocketId)?.name : "";
+    const statusMessage = nextHostPlayerName
+        ? `${leavingPlayerName} has left. ${nextHostPlayerName} is the new host.`
+        : `${leavingPlayerName} has left.`;
+    const leaveSystemMessage = appendRoomMessage(room, createSystemChatMessage(statusMessage));
 
     // if we made it here, there are still players left in the room but the current player succesfully left
     return {
@@ -240,6 +260,7 @@ export const leaveRoom = (socketId) => {
         roomDeleted: false, 
         removedPlayerId: socketId,
         nextHostSocketId: room.hostSocketId,
+        systemMessage: leaveSystemMessage,
     };
 };
 
@@ -330,14 +351,7 @@ export const addChatMessage = (socketId, text) => {
 
     player.activeMessage = messageObj.text;
     player.updatedAt = messageObj.createdAt;
-    room.messages.push(messageObj);
-
-    // only maintain the last 50 messages in the room
-    if (room.messages.length > MAX_MESSAGES_PER_ROOM) {
-        room.messages.shift();
-    }
-
-    touchRoom(room);
+    appendRoomMessage(room, messageObj);
 
     return {
         roomId,
