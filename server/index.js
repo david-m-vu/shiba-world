@@ -15,10 +15,21 @@ import { registerSocketHandlers } from "./socket/handlers.js";
 import { roomExists } from "./world/rooms.js";
 
 const PORT = Number(process.env.PORT ?? 3001);
-const CLIENT_ORIGINS = (process.env.CLIENT_ORIGINS ?? "http://localhost:5173")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+const normalizeOrigin = (value) => {
+    try {
+        // this removes vrittle mismatches like trailing slashes or similar URL formatting differences
+        return new URL(String(value ?? "").trim()).origin;
+    } catch {
+        return null;
+    }
+};
+
+const CLIENT_ORIGINS = Array.from(new Set(
+    (process.env.CLIENT_ORIGINS ?? "http://localhost:5173")
+        .split(",")
+        .map((origin) => normalizeOrigin(origin))
+        .filter(Boolean),
+));
 
 const isAllowedOrigin = (origin) => {
     // curl or Postman is a case where origin is empty/missing
@@ -26,13 +37,18 @@ const isAllowedOrigin = (origin) => {
         return true;
     }
 
-    return CLIENT_ORIGINS.includes(origin);
+    const normalizedOrigin = normalizeOrigin(origin);
+    if (!normalizedOrigin) {
+        return false;
+    }
+
+    return CLIENT_ORIGINS.includes(normalizedOrigin);
 };
 
 const app = express();
 const httpServer = http.createServer(app); // actual node http server that serves the express app
 
-app.use(morgan("dev"));
+app.use(morgan("common"));
 app.use(express.json());
 app.use(cors({
     origin(origin, callback) { // callback(error, allow) is the function you call to tell the CORS middleware whether to allow the request
