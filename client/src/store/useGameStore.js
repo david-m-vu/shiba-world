@@ -10,7 +10,10 @@ import { toSafeVector3, toSafeVector4 } from "../lib/util.js";
 
 const DEFAULT_TOAST_DURATION_MS = 5000;
 const MAX_ACTIVE_TOASTS = 5;
+const MAX_MESSAGES_PER_ROOM = 50;
+
 let nextToastId = 0;
+let nextLocalSystemMessageId = 0;
 
 const createToastId = () => {
     nextToastId++;
@@ -96,9 +99,51 @@ const normalizeRoomState = (room = {}) => {
         hostSocketId: room.hostSocketId ?? null,
         playersById,
         objectsById,
-        messages: Array.isArray(room.messages) ? room.messages : []
+        messages: Array.isArray(room.messages)
+            ? room.messages.map((message) => normalizeMessage(message)).filter((message) => message.id)
+            : []
     }
 }
+
+const normalizeMessage = (message = {}) => {
+    return {
+        id: String(message.id ?? ""),
+        playerId: String(message.playerId ?? ""),
+        playerName: String(message.playerName ?? "Anonymous"),
+        text: String(message.text ?? "").trim(),
+        createdAt: message.createdAt ?? null,
+        type: message.type === "system" ? "system" : "chat",
+    };
+};
+
+const appendMessage = (messages = [], nextMessage) => {
+    const normalizedMessage = normalizeMessage(nextMessage);
+    if (!normalizedMessage.id || !normalizedMessage.text) {
+        return messages;
+    }
+
+    if (messages.some((message) => message.id === normalizedMessage.id)) {
+        return messages;
+    }
+
+    return [...messages, normalizedMessage].slice(-MAX_MESSAGES_PER_ROOM);
+};
+
+const createSystemMessage = (text) => {
+    const safeText = String(text ?? "").trim();
+    if (!safeText) {
+        return null;
+    }
+
+    nextLocalSystemMessageId++;
+
+    return {
+        id: `system-${Date.now()}-${nextLocalSystemMessageId}`,
+        text: safeText,
+        createdAt: new Date().toISOString(),
+        type: "system",
+    };
+};
 
 const applyRoomSnapshot = (set, roomSnapshot = {}, selfPlayerId = null) => {
     const normalizedRoomState = normalizeRoomState(roomSnapshot);
@@ -182,11 +227,16 @@ const bindSocketListeners = (set, get, socket) => {
             return;
         }
 
+        const joinSystemMessage = createSystemMessage(`${player.name} has joined.`);
+
         set((state) => ({
             playersById: {
                 ...state.playersById,
                 [player.id]: player,
-            }
+            },
+            messages: joinSystemMessage
+                ? appendMessage(state.messages, joinSystemMessage)
+                : state.messages,
         }))
 
         if (player.id !== selfPlayerId) {
@@ -200,10 +250,20 @@ const bindSocketListeners = (set, get, socket) => {
         const playerId = String(payload.playerId ?? "");
         const prevHostSocketId = get().hostSocketId;
         const nextHostSocketId = payload.hostSocketId ?? null;
-        const leavingPlayerName = get().playersById[playerId]?.name ?? "A player";
+        
+        const currentPlayersById = get().playersById;
+        const leavingPlayerName = currentPlayersById[playerId]?.name ?? "A player";
+        const nextHostPlayerName = nextHostSocketId ? currentPlayersById[nextHostSocketId]?.name : "";
+        const didHostChange = prevHostSocketId !== nextHostSocketId;
+        const statusMessage = didHostChange && nextHostPlayerName
+            ? `${leavingPlayerName} has left. ${nextHostPlayerName} is the new host.`
+            : `${leavingPlayerName} has left.`;
+
         if (!playerId) {
             return;
         }
+
+        const leaveSystemMessage = createSystemMessage(statusMessage);
 
         set((state) => {
             const nextPlayersById = { ...state.playersById }; // need to copy because zustand state should be treated as immutable
@@ -212,11 +272,12 @@ const bindSocketListeners = (set, get, socket) => {
             return {
                 hostSocketId: nextHostSocketId,
                 playersById: nextPlayersById,
+                messages: leaveSystemMessage
+                    ? appendMessage(state.messages, leaveSystemMessage)
+                    : state.messages,
             }
         })
 
-        const nextHostPlayerName = nextHostSocketId ? get().playersById[nextHostSocketId]?.name : "";
-        const didHostChange = prevHostSocketId !== nextHostSocketId;
         const toastMessage = didHostChange && nextHostPlayerName
             ? `${leavingPlayerName} has left. ${nextHostPlayerName} is the new host.`
             : `${leavingPlayerName} has left.`;
@@ -270,19 +331,14 @@ const bindSocketListeners = (set, get, socket) => {
     });
 
     socket.on("chat:message", (payload = {}) => {
-        const message = payload.message;
-        if (!message?.id) {
+        const message = normalizeMessage(payload.message);
+        if (!message.id) {
             return;
         }
 
         set((state) => {
-            if (state.messages.some((entry) => entry.id === message.id)) {
-                // if message already exists, leave state unchanged
-                return state;
-            }
-
             return {
-                messages: [...state.messages, message]
+                messages: appendMessage(state.messages, message)
             }
         })
     })

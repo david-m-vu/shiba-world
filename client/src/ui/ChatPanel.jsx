@@ -2,7 +2,7 @@
  * 2D UI chat overlay displaying room messages
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useGameStore } from "../store/useGameStore.js";
 
 import ExpandIcon from "../assets/icons/expand_less.svg?react";
@@ -40,15 +40,36 @@ const ChatPanel = () => {
 
     const messagesListRef = useRef(null);
     const inputRef = useRef(null);
+    const latestMessageId = String(messages[messages.length - 1]?.id ?? "");
 
-    // if # of messages changes, scroll top edge all the way to the size of the container
-    useEffect(() => {
+    const scrollMessagesToBottom = useCallback(() => {
         if (!messagesListRef.current) {
             return;
         }
 
         messagesListRef.current.scrollTop = messagesListRef.current.scrollHeight;
-    }, [messages.length]);
+    }, []);
+
+    const toggleChatVisibility = () => {
+        setIsChatHidden((previousIsChatHidden) => {
+            const nextIsChatHidden = !previousIsChatHidden;
+
+            if (!nextIsChatHidden) {
+                window.requestAnimationFrame(() => {
+                    scrollMessagesToBottom();
+                });
+            }
+
+            return nextIsChatHidden;
+        });
+    };
+
+    // scroll to latest message whenever the newest message id changes
+    useEffect(() => {
+        window.requestAnimationFrame(() => {
+            scrollMessagesToBottom();
+        });
+    }, [latestMessageId, scrollMessagesToBottom]);
 
     useEffect(() => {
         const isEditableElement = (element) => {
@@ -112,6 +133,9 @@ const ChatPanel = () => {
                 inputRef.current.focus();
                 const valueLength = inputRef.current.value.length;
                 inputRef.current.setSelectionRange(valueLength, valueLength); // set the text cursor/selection at the end of the current message instead of highligting text
+
+                // scroll to bottom
+                scrollMessagesToBottom();
             });
         };
 
@@ -120,13 +144,11 @@ const ChatPanel = () => {
         return () => {
             window.removeEventListener("keydown", handleGlobalChatFocusShortcut, true);
         };
-    }, []);
+    }, [scrollMessagesToBottom]);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
         event.stopPropagation(); // prevent propagation in the capturing and bubbling phases (like in global keyboard controls)
-
-        setIsChatHidden(false);
 
         if (isSending) {
             return;
@@ -136,6 +158,8 @@ const ChatPanel = () => {
         if (!safeText) {
             return;
         }
+
+        setIsChatHidden(false);
 
         setIsSending(true);
         const response = await sendChatMessage(safeText);
@@ -151,16 +175,40 @@ const ChatPanel = () => {
         setDraftMessage("");
     };
 
+    // const handleFormKeyDownCapture = (event) => {
+    //     event.stopPropagation(); // keep key input from reaching global movement/chat shortcuts
+
+    //     if (event.key !== "Enter") {
+    //         return;
+    //     }
+
+    //     if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
+    //         return;
+    //     }
+
+    //     if (document.activeElement !== inputRef.current) {
+    //         return;
+    //     }
+
+    //     const safeText = String(draftMessage ?? "").trim();
+    //     if (safeText) {
+    //         return;
+    //     }
+
+    //     event.preventDefault();
+    //     inputRef.current?.blur();
+    // };
+
     return (
         <div className="pointer-events-none absolute bottom-2 left-2 z-50">
-            <section className="pointer-events-auto flex w-[min(95vw,28rem)] flex-col overflow-hidden border border-white/15 bg-[rgba(85,85,85,0.20)] text-white shadow-lg backdrop-blur-xs">
+            <section className="pointer-events-auto flex w-[min(95vw,28rem)] flex-col overflow-hidden border border-white/15 bg-[rgba(25,25,25,0.3)] text-white shadow-lg backdrop-blur-xs">
                 <header className="flex flex-row justify-between border-b border-white/10 px-3 py-2 text-sm tracking-[0.18em] text-white/85">
-                    <p>CHAT</p>
+                    <p>SHIBA_CHAT</p>
                     {isChatHidden ? 
                         <button
                             type="button"    
                             className="hover:cursor-pointer"
-                            onClick={() => setIsChatHidden((prev) => !prev)}
+                            onClick={toggleChatVisibility}
                         >
                             <ExpandIcon className="h-5 w-auto" />
                         </button>   
@@ -168,7 +216,7 @@ const ChatPanel = () => {
                         <button 
                             type="button"
                             className="text-3xl leading-3.5 hover:cursor-pointer"
-                            onClick={() => setIsChatHidden((prev) => !prev)}
+                            onClick={toggleChatVisibility}
                         >
                             -
                         </button>
@@ -179,12 +227,13 @@ const ChatPanel = () => {
                 {!isChatHidden && 
                     <ul
                         ref={messagesListRef}
-                        className="chat-scroll flex min-h-40 max-h-64 flex-col gap-2 overflow-y-auto px-2 py-2"
+                        className="chat-scroll flex min-h-40 max-h-80 flex-col gap-2 overflow-y-auto px-2 py-2"
                     >
                         {messages.length === 0 ? (
                             <p className="text-sm text-white/60">No messages yet.</p>
                         ) : (
                             messages.map((message, index) => {
+                                const isSystemMessage = message.type === "system";
                                 const safePlayerId = String(message.playerId ?? "");
                                 const safePlayerName = String(
                                     message.playerName ?? playersById[safePlayerId]?.name ?? "Anonymous"
@@ -194,25 +243,46 @@ const ChatPanel = () => {
                                 const isOwnMessage = safePlayerId && safePlayerId === selfPlayerId;
                                 const messageKey = String(message.id ?? `${safePlayerId}-${message.createdAt ?? index}`);
 
+                                if (isSystemMessage) {
+                                    return (
+                                        <li
+                                            key={messageKey}
+                                            tabIndex={0}
+                                            title={safeText}
+                                            className="flex items-start gap-2 rounded-lg border border-amber-300/45 bg-amber-500/15 px-2.5 py-1 text-sm
+                                                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/70"
+                                        >
+                                            {/* <span className="shrink-0 tracking-[0.08em] text-amber-100">SYSTEM:</span> */}
+                                            <p className="min-w-0 flex-1 wrap-break-word line-clamp-2 italic leading-5 text-amber-100">
+                                                {safeText}
+                                            </p>
+                                            {messageTime ? (
+                                                <time className="shrink-0 self-start text-xs leading-5 text-white/60">{messageTime}</time>
+                                            ) : null}
+                                        </li>
+                                    );
+                                }
+
                                 return (
                                     <li
                                         key={messageKey}
-                                        className={`rounded-lg border px-2.5 py-1 ${isOwnMessage
-                                            ? "border-primary/45 bg-primary/20"
+                                        className={`flex items-start gap-2 rounded-lg border px-2.5 py-1 text-sm ${isOwnMessage
+                                            ? "border-primary/45 bg-primary/10"
                                             : "border-white/15 bg-white/5"
                                             }`}
                                     >
-                                        <div className="mb-1 flex flex-row items-center justify-between gap-2 text-xs">
-                                            <span className="truncate text-white/85">
-                                                {isOwnMessage ? "You" : safePlayerName}
+                                            <span 
+                                                className="truncate text-primary/95"
+                                            >
+                                                {isOwnMessage ? "You:" : `${safePlayerName}:`}
                                             </span>
+                                            <p className="min-w-0 flex-1 wrap-break-word leading-5 text-white/95">
+                                                {safeText}
+                                            </p>
                                             {messageTime ? (
-                                                <time className="shrink-0 text-white/60">{messageTime}</time>
+                                                <time className="shrink-0 self-start text-xs leading-5 text-white/60">{messageTime}</time>
                                             ) : null}
-                                        </div>
-                                        <p className="wrap-break-word text-sm leading-5 text-white/95">
-                                            {safeText}
-                                        </p>
+                                        
                                     </li>
                                 );
                             })

@@ -39,7 +39,7 @@ const Toast = ({
     return (
         <div
             className={[
-                "relative pointer-events-auto max-w-sm break-words rounded-2xl border border-[#7F7F7F] bg-[rgba(85,85,85,0.5)] px-4 py-2.5 pr-8 text-sm text-white shadow-lg backdrop-blur-sm",
+                "relative pointer-events-auto max-w-sm wrap-break-word rounded-2xl border border-[#7F7F7F] bg-[rgba(25,25,25,0.5)] px-4 py-2.5 pr-8 text-sm text-white shadow-lg backdrop-blur-sm",
                 "transition-all duration-300 ease-out will-change-transform",
                 isVisible ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
                 className,
