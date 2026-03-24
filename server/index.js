@@ -14,6 +14,7 @@ import { Server } from "socket.io";
 import { registerSocketHandlers } from "./socket/handlers.js";
 import { roomExists } from "./world/rooms.js";
 
+// note render sets an environment variable named PORT for our web service at runtime
 const PORT = Number(process.env.PORT ?? 3001);
 const normalizeOrigin = (value) => {
     try {
