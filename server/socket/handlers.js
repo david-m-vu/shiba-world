@@ -85,8 +85,6 @@ export const registerSocketHandlers = (io, socket) => {
 
             acknowledge(callback, response);
 
-            
-
         } catch (error) {
             emitRoomError(socket, callback, error);
         }
@@ -135,6 +133,8 @@ export const registerSocketHandlers = (io, socket) => {
                     player: joinedRoomObj.player,
                 });
             }
+
+            console.log(`${joinedRoomObj.player.name} (${socket.id}) joined room ${joinedRoomObj.room.id}`)
 
         } catch (error) {
             emitRoomError(socket, callback, error);
@@ -214,6 +214,5 @@ export const registerSocketHandlers = (io, socket) => {
         emitDeparture(io, socket, departureObj);
 
         console.log(`${socket.id} disconnected`)
-        console.log("left room:", departureObj);
     });
 };

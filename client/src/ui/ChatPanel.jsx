@@ -177,33 +177,34 @@ const ChatPanel = () => {
         setDraftMessage("");
     };
 
-    // const handleFormKeyDownCapture = (event) => {
-    //     event.stopPropagation(); // keep key input from reaching global movement/chat shortcuts
+    const handleFormKeyDownCapture = (event) => {
+        event.stopPropagation(); // keep key input from reaching global movement/chat shortcuts
 
-    //     if (event.key !== "Enter") {
-    //         return;
-    //     }
+        if (event.key !== "Enter") {
+            return;
+        }
 
-    //     if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
-    //         return;
-    //     }
+        if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) {
+            return;
+        }
 
-    //     if (document.activeElement !== inputRef.current) {
-    //         return;
-    //     }
+        if (document.activeElement !== inputRef.current) {
+            return;
+        }
 
-    //     const safeText = String(draftMessage ?? "").trim();
-    //     if (safeText) {
-    //         return;
-    //     }
+        const safeText = String(draftMessage ?? "").trim();
+        if (safeText) {
+            return;
+        }
 
-    //     event.preventDefault();
-    //     inputRef.current?.blur();
-    // };
+        event.preventDefault();
+        inputRef.current?.blur();
+    };
 
     return (
         <div className="pointer-events-none absolute bottom-2 left-2 z-50">
-            <section className="pointer-events-auto flex w-[min(95vw,28rem)] flex-col overflow-hidden border border-white/15 bg-[rgba(25,25,25,0.3)] text-white shadow-lg backdrop-blur-xs">
+            <section className="pointer-events-auto flex w-[min(95vw,28rem)] flex-col overflow-hidden border border-white/15 bg-[rgba(25,25,25,0.2)]
+                            text-white shadow-lg backdrop-blur-xs transition-colors focus-within:bg-[rgba(25,25,25,0.6)] hover:bg-[rgba(25,25,25,0.6)]">
                 <header className="flex flex-row justify-between border-b border-white/10 px-3 py-2 text-sm tracking-[0.18em] text-white/85">
                     <p>SHIBA_CHAT</p>
                     {isChatHidden ? 
@@ -295,8 +296,8 @@ const ChatPanel = () => {
 
                 <form
                     onSubmit={handleSubmit}
-                    onKeyDownCapture={(event) => event.stopPropagation()} // stopPropogation here makes it so that window doesn't see these key events that would normally be bubbled up
-                    onKeyUpCapture={(event) => event.stopPropagation()} // stopPropogation here makes it so that window doesn't see these key events that would normally be bubbled up
+                    onKeyDownCapture={handleFormKeyDownCapture} // stopPropogation here makes it so that window doesn't see these key events that would normally be bubbled up
+                    // note we don't have onKeyUpCapture due to issue where if user holds WASD then focuses on chat, the keyUp that triggers movement stop doesn't apply
                     className="flex gap-2 border-t border-white/10 bg-black/20 p-2"
                 >
                     <input

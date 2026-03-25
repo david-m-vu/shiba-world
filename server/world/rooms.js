@@ -245,8 +245,6 @@ export const joinRoom = ({ roomId, socketId, playerName }) => {
     socketToRoomId.set(socketId, roomId);
     const joinSystemMessage = appendRoomMessage(room, createSystemChatMessage(`${player.name} has joined.`));
 
-    console.log(`${player.name} joined room ${room.id}`)
-
     return {
         player,
         systemMessage: joinSystemMessage,
@@ -285,7 +283,7 @@ export const leaveRoom = (socketId) => {
         room.hostSocketId = nextHost.done ? null : nextHost.value;
     }
 
-    console.log(`player ${socketId} left the room, room size is ${room.players.size}, host is ${room.hostSocketId}`)
+    console.log(`${socketId} left the room, room size is ${room.players.size}, host is ${room.hostSocketId}`)
 
     if (room.players.size === 0) {
         rooms.delete(roomId);
