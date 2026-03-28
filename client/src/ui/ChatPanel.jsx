@@ -10,6 +10,8 @@ import SendIcon from "../assets/icons/send.svg?react";
 import ShibaIcon from "../assets/icons/shiba-icon.png"
 import ShibaInuFace from "../assets/icons/shiba-inu.png";
 
+import { isEditableElement } from "../lib/dom.js";
+
 const CHAT_INPUT_MAX_LENGTH = 240;
 
 const formatMessageTime = (value) => {
@@ -74,19 +76,6 @@ const ChatPanel = () => {
     }, [latestMessageId, scrollMessagesToBottom]);
 
     useEffect(() => {
-        const isEditableElement = (element) => {
-            if (!(element instanceof HTMLElement)) {
-                return false;
-            }
-
-            if (element.isContentEditable) {
-                return true;
-            }
-
-            const tagName = element.tagName;
-            return tagName === "INPUT" || tagName === "TEXTAREA" || tagName === "SELECT";
-        };
-
         const handleGlobalChatFocusShortcut = (event) => {
             if (event.key === "Escape" && document.activeElement === inputRef.current) {
                 event.preventDefault();

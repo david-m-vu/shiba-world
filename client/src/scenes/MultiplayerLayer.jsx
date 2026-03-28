@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useRapier } from "@react-three/rapier";
-import { Euler, Quaternion } from "three";
+import { Euler, Quaternion, Vector3 } from "three";
 
 import Avatar from "../components/Avatar.jsx";
 import RemoteAvatar from "../components/RemoteAvatar.jsx";
@@ -26,6 +26,7 @@ import { useThirdPersonCamera } from "../hooks/useThirdPersonCamera.js";
 import { useAvatarRotation } from "../hooks/useAvatarRotation.js";
 
 import { getShortestAngleDelta } from "../lib/util.js";
+import { isEditableElement } from "../lib/dom.js";
 
 const LOCAL_PLAYER_DEFAULT_POSITION = [0, 5, 0];
 const LOCAL_PLAYER_DEFAULT_ROTATION = [0, 0, 0];
@@ -33,6 +34,14 @@ const LOCAL_PLAYER_DEFAULT_ROTATION = [0, 0, 0];
 const PLAYER_SYNC_INTERVAL_MS = 66;
 const PLAYER_SYNC_POSITION_EPSILON = 0.02;
 const PLAYER_SYNC_ROTATION_EPSILON = 0.03;
+
+const KIOSK_INTERACT_RADIUS = 2.25;
+const KIOSK_INTERACT_POSITION = [0, 0, 3];
+
+const WATCH_CAMERA_POSITION = [0, 15, 3];
+const WATCH_CAMERA_TARGET = [0, 10, 30];
+const WATCH_CAMERA_LERP_SPEED = 2;
+const WATCH_CAMERA_BACK_LERP_SPEED = 15;
 
 const MultiplayerLayer = () => {
     const { camera, gl } = useThree();
@@ -61,6 +70,8 @@ const MultiplayerLayer = () => {
         return String(state.playersById[selfId]?.activeMessage ?? "");
     });
     const sendPlayerUpdate = useGameStore((state) => state.sendPlayerUpdate);
+    const watchTogetherOpen = useGameStore((state) => state.watchTogetherOpen);
+    const openWatchTogether = useGameStore((state) => state.openWatchTogether);
 
     const remotePlayers = useRemotePlayers();
 
@@ -92,6 +103,7 @@ const MultiplayerLayer = () => {
     // uses every frame to decide: has enough time passed (PLAYER_SYNC_INTERVAL_MS), and did position/rotation change past epsilon threshold before calling sendPlayerUpdate
     // also updates on null
     const lastSentStateRef = useRef(null); 
+    const isNearKioskRef = useRef(false);
 
     // get hooks for player / camera movement 
     const {
@@ -112,6 +124,13 @@ const MultiplayerLayer = () => {
     });
 
     const { updateAvatarRotation } = useAvatarRotation();
+    const watchCameraPositionRef = useMemo(() => new Vector3(...WATCH_CAMERA_POSITION), []);
+    const watchCameraTargetRef = useMemo(() => new Vector3(...WATCH_CAMERA_TARGET), []);
+    const watchLookTargetRef = useMemo(() => new Vector3(...WATCH_CAMERA_TARGET), []);
+    const preWatchCameraPositionRef = useMemo(() => new Vector3(), []);
+    const preWatchCameraTargetRef = useMemo(() => new Vector3(), []);
+    const wasWatchTogetherOpenRef = useRef(false); // stores the previous frame/effect value of watchTogetherOpen and lets us detect transitions
+    const shouldReturnToPreWatchCameraRef = useRef(false); // set to true when WatchTogether closes, useFrame sees and lerps, then eventually set back to false
 
     // Reset camera each time MultiplayerLayer mounts (join room transition).
     useEffect(() => {
@@ -161,32 +180,183 @@ const MultiplayerLayer = () => {
         sendPlayerUpdate,
     ]);
 
+    // useEffect to register interact with E for watch2gether
+    useEffect(() => {
+        const handleInteractKeyDown = (event) => {
+            // event.repeat is a keyboard event flag that becomes true when the keydown is auto-firing because the key is being held down
+            if (watchTogetherOpen || event.repeat) {
+                return;
+            }
+
+            const key = String(event.key ?? "").toLowerCase();
+            // use code for when keyboard has a different layout where the physical key types another letter, but physucal position is still at KeyE
+            if (event.code !== "KeyE" && key !== "e") {
+                return;
+            }
+
+            if (!isNearKioskRef.current) {
+                return;
+            }
+
+            if (isEditableElement(document.activeElement)) {
+                return;
+            }
+
+            event.preventDefault();
+            event.stopPropagation();
+
+            if (document.pointerLockElement) {
+                try {
+                    document.exitPointerLock();
+                } catch {
+                    // no-op
+                }
+            }
+
+            openWatchTogether();
+        };
+
+        window.addEventListener("keydown", handleInteractKeyDown, true);
+        return () => {
+            window.removeEventListener("keydown", handleInteractKeyDown, true);
+        };
+    }, [openWatchTogether, watchTogetherOpen]);
+
+    // when watchTogether UI is opened, stop player from moving
+    useEffect(() => {
+        if (!watchTogetherOpen) {
+            return;
+        }
+
+        // Clear movement intent while the panel is open so key-hold state does not leak on close.
+        keysRef.current.w = false;
+        keysRef.current.a = false;
+        keysRef.current.s = false;
+        keysRef.current.d = false;
+        jumpQueuedRef.current = false;
+
+        const rb = localRigidBodyRef.current;
+        if (!rb) {
+            return;
+        }
+
+        // Stop horizontal movement but keep vertical gravity/fall behavior unchanged.
+        const linearVelocity = rb.linvel();
+        rb.setLinvel({ x: 0, y: linearVelocity.y, z: 0 }, true);
+    }, [jumpQueuedRef, keysRef, watchTogetherOpen]);
+
+    useEffect(() => {
+        // if watch together is open but it wasn't before
+        if (watchTogetherOpen && !wasWatchTogetherOpenRef.current) {
+            // Snapshot camera pose before entering watch mode.
+            preWatchCameraPositionRef.copy(camera.position);
+
+            if (controlsRef.current) {
+                preWatchCameraTargetRef.copy(controlsRef.current.target);
+            } else { // default to setting target at screen
+                preWatchCameraTargetRef.copy(watchCameraTargetRef);
+            }
+
+            shouldReturnToPreWatchCameraRef.current = false;
+        }
+
+        // if watch together wasn't open and it was open before
+        if (!watchTogetherOpen && wasWatchTogetherOpenRef.current) {
+            // Start return transition when watch mode closes.
+            shouldReturnToPreWatchCameraRef.current = true;
+        }
+
+        wasWatchTogetherOpenRef.current = watchTogetherOpen;
+    }, [camera, watchCameraTargetRef, watchTogetherOpen, preWatchCameraPositionRef, preWatchCameraTargetRef]);
+
     useFrame((state, delta) => {
         const rb = localRigidBodyRef.current;
         if (!rb) {
             return;
         }
 
-        updateMovement({
-            rb,
-            world,
-            camera,
-            cameraLockMode,
-            keysRef,
-            jumpQueuedRef,
-            cameraYawRef,
-            cameraPitchRef,
-            infiniteJumpEnabled,
-        });
-        updateCamera({
-            camera,
-            controls: controlsRef.current,
-            localPosition,
-            cameraLockMode,
-            cameraYawRef,
-            cameraPitchRef,
-            cameraDistanceRef,
-        });
+        const isMovementLocked = watchTogetherOpen || shouldReturnToPreWatchCameraRef.current;
+
+        if (isMovementLocked) {
+            // Keep input and horizontal velocity neutral while watch mode is open
+            // and while camera is returning to the pre-watch pose.
+            keysRef.current.w = false;
+            keysRef.current.a = false;
+            keysRef.current.s = false;
+            keysRef.current.d = false;
+            jumpQueuedRef.current = false;
+
+            const linearVelocity = rb.linvel();
+            rb.setLinvel({ x: 0, y: linearVelocity.y, z: 0 }, true);
+        }
+
+        if (!isMovementLocked) {
+            updateMovement({
+                rb,
+                world,
+                camera,
+                cameraLockMode,
+                keysRef,
+                jumpQueuedRef,
+                cameraYawRef,
+                cameraPitchRef,
+                infiniteJumpEnabled,
+            });
+        }
+
+        if (controlsRef.current) {
+            controlsRef.current.enabled = !cameraLockMode && !watchTogetherOpen && !shouldReturnToPreWatchCameraRef.current;
+        }
+
+        if (watchTogetherOpen) {
+            const lerpAlpha = Math.min(1, delta * WATCH_CAMERA_LERP_SPEED);
+            camera.position.lerp(watchCameraPositionRef, lerpAlpha);
+            watchLookTargetRef.lerp(watchCameraTargetRef, lerpAlpha);
+            camera.lookAt(watchLookTargetRef);
+
+            // to keep OrbitControls internal state synced with the camera target
+            if (controlsRef.current) {
+                controlsRef.current.target.copy(watchLookTargetRef);
+                controlsRef.current.update();
+            }
+        } else if (shouldReturnToPreWatchCameraRef.current) {
+            const lerpAlpha = Math.min(1, delta * WATCH_CAMERA_BACK_LERP_SPEED);
+            camera.position.lerp(preWatchCameraPositionRef, lerpAlpha);
+            
+            // basically lerp look-at target point from watchLookTarget to previous camera look at
+            watchLookTargetRef.lerp(preWatchCameraTargetRef, lerpAlpha);
+            camera.lookAt(watchLookTargetRef);
+
+            if (controlsRef.current) {
+                controlsRef.current.target.copy(watchLookTargetRef);
+                controlsRef.current.update();
+            }
+
+            // snap to previous positions and look ats once lerp has reached a certain distance to original position
+            // then finally set shouldReturnToPreWatchCameraRef to false
+            const isPositionSettled = camera.position.distanceToSquared(preWatchCameraPositionRef) < 0.01;
+            const isTargetSettled = watchLookTargetRef.distanceToSquared(preWatchCameraTargetRef) < 0.01;
+            if (isPositionSettled && isTargetSettled) {
+                camera.position.copy(preWatchCameraPositionRef);
+                watchLookTargetRef.copy(preWatchCameraTargetRef);
+                camera.lookAt(watchLookTargetRef);
+                if (controlsRef.current) {
+                    controlsRef.current.target.copy(watchLookTargetRef);
+                    controlsRef.current.update();
+                }
+                shouldReturnToPreWatchCameraRef.current = false;
+            }
+        } else {
+            updateCamera({
+                camera,
+                controls: controlsRef.current,
+                localPosition,
+                cameraLockMode,
+                cameraYawRef,
+                cameraPitchRef,
+                cameraDistanceRef,
+            });
+        }
         updateAvatarRotation({
             rb,
             cameraLockMode,
@@ -198,6 +368,10 @@ const MultiplayerLayer = () => {
         if (localVisualRef.current) {
             localVisualRef.current.visible = camera.position.distanceTo(localPosition) > HIDE_DISTANCE;
         }
+
+        const deltaX = localPosition.x - KIOSK_INTERACT_POSITION[0];
+        const deltaZ = localPosition.z - KIOSK_INTERACT_POSITION[2];
+        isNearKioskRef.current = Math.hypot(deltaX, deltaZ) <= KIOSK_INTERACT_RADIUS;
 
         if (!selfPlayerId) {
             return;
@@ -264,7 +438,7 @@ const MultiplayerLayer = () => {
         <>
             <OrbitControls
                 ref={controlsRef}
-                enabled={!cameraLockMode}
+                enabled={!cameraLockMode && !watchTogetherOpen}
                 enableDamping
                 dampingFactor={0.08}
                 minDistance={CAMERA_MIN_DISTANCE}

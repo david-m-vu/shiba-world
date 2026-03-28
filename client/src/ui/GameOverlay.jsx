@@ -5,6 +5,7 @@ import { Stats } from "@react-three/drei";
 import Crosshair from "../components/ui/Crosshair.jsx";
 import { useGameStore } from "../store/useGameStore.js";
 import ChatPanel from "./ChatPanel.jsx";
+import WatchTogether from "./WatchTogether.jsx";
 
 // ?react is a vite query suffix that tells the svg plug (vite-plugin0svgr) to transform the svg into a React component
 import HelpIcon from "../assets/icons/help_outline.svg?react"; 
@@ -87,6 +88,7 @@ const GameOverlay = () => {
     const navigate = useNavigate();
 
     const currentRoomId = useGameStore((state) => state.currentRoomId)
+    const watchTogetherOpen = useGameStore((state) => state.watchTogetherOpen);
  
     const cameraLockMode = useGameStore((state) => state.cameraLockMode);
     const sunsetMode = useGameStore((state) => state.sunsetMode);
@@ -411,6 +413,7 @@ const GameOverlay = () => {
             </div>
 
             <ChatPanel />
+            {watchTogetherOpen ? <WatchTogether /> : null}
         </div>
     )
 }

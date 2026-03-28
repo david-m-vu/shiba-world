@@ -14,15 +14,12 @@ import PreethamSky from "../components/PreethamSky.jsx";
 import OceanBackdrop from "../components/OceanBackdrop.jsx";
 import { LoungeChairSection, LoungeSection, CabanaSection, PlayAreaSection } from "../components/world/sections/index.js";
 import {
-    CoffeeTable,
-    Couch,
-    LoungeChair,
     PerimeterRailing,
     Planter,
     Slab,
-    Grass,
     CanopyLight,
-    FlyingScreen
+    FlyingScreen,
+    Kiosk
 } from "../components/world/objects/index.js";
 
 const showDatGUI = import.meta.env.VITE_SHOW_DAT_GUI === "true";
@@ -57,6 +54,12 @@ const DEFAULT_COLORS = {
     screenFrame: "#808080",
     screenSupport: "#000000",
     screenBack: "#808080",
+    
+    kioskSupport: "#101118",
+    kioskBody: "#757575",
+    kioskFrame: "#20232b",
+    kioskScreen: "#f6a651", // orig #d81dc5
+    kioskScreenGlow: "#f6a651", // orig #de94f9
 };
 
 const SKY_PARAMS = {
@@ -381,6 +384,14 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
         addFolderColor(screen, "screenSupport", "Screen Support");
         addFolderColor(screen, "screenBack", "Screen Back");
 
+        const kiosk = gui.addFolder("Kiosk");
+        kiosk.open();
+        addFolderColor(kiosk, "kioskSupport", "Kiosk Support");
+        addFolderColor(kiosk, "kioskBody", "Kiosk Body");
+        addFolderColor(kiosk, "kioskFrame", "Kiosk Frame");
+        addFolderColor(kiosk, "kioskScreen", "Kiosk Screen");
+        addFolderColor(kiosk, "kioskScreenGlow", "Kiosk Screen Glow");
+
         const skyline = gui.addFolder("Skyline");
         skyline.open();
         addFolderColor(skyline, "skyline", "Buildings");
@@ -546,6 +557,16 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
                 hasPlants
             />
 
+            <Kiosk
+                position={[0,0,3]}
+                supportColor={colors.kioskSupport}
+                bodyColor={colors.kioskBody}
+                frameColor={colors.kioskFrame}
+                screenColor={colors.kioskScreen}
+                screenGlow={colors.kioskScreenGlow}
+                rotation={[0, Math.PI, 0]}
+            />
+
             <LoungeChairSection 
                 position={[0,0,3]}
                 planterProps={{
@@ -573,7 +594,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
 
             {videoScreenEnabled && 
                 <FlyingScreen
-                    position={[0, 10, 25]}
+                    position={[0, 10, 30]} // orig 25
                     rotation={[0, Math.PI, 0]}
                     screenColor={colors.screen}
                     frameColor={colors.screenFrame}

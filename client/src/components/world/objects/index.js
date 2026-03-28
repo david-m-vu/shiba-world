@@ -10,3 +10,4 @@ export { default as CanopyLight } from "./CanopyLight.jsx";
 export { default as Chair } from "./Chair.jsx";
 export { default as Table } from "./Table.jsx";
 export { default as FlyingScreen } from "./FlyingScreen.jsx";
+export { default as Kiosk } from "./Kiosk.jsx";

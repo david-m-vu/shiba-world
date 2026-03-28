@@ -151,6 +151,7 @@ const clearRoomState = (set) => {
         objectsById: {},
         messages: [],
         cameraLockMode: false,
+        watchTogetherOpen: false,
     })
 }
 
@@ -331,6 +332,7 @@ export const useGameStore = create(
             infiniteJumpEnabled: false,
             debugModeEnabled: false,
             resetCharacterRequestId: 0,
+            watchTogetherOpen: false,
 
             localPlayerName: "",
             currentRoomId: null,
@@ -419,6 +421,12 @@ export const useGameStore = create(
             // simply updating this resetCharacterRequestId state is what triggers a position/rotation/velocity reset in MultiplayerLayer.jsx
             requestResetCharacter: () => {
                 set((state) => ({ resetCharacterRequestId: state.resetCharacterRequestId + 1 }));
+            },
+            openWatchTogether: () => {
+                set({ watchTogetherOpen: true });
+            },
+            closeWatchTogether: () => {
+                set({ watchTogetherOpen: false });
             },
 
             setSocketListenersReady: (socketListenersReady) => {
