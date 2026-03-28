@@ -14,7 +14,7 @@ export const LandingShell = ({ headerContent, children }) => {
         <div className="absolute inset-0 flex flex-col justify-center items-center gap-6">
             {/* Title */}
             <div className="flex flex-row gap-2.5 px-5 py-2.5 justify-center items-center bg-[rgba(246,166,81,0.7)] rounded-4xl">
-                <img src={ShibaInuFace} alt="Shiba Inu face" />
+                <img src={ShibaInuFace} alt="Shiba Inu logo" />
                 <h1 className="text-[4rem]">SHIBA_WORLD</h1>
             </div>
 

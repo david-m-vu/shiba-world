@@ -5,7 +5,7 @@ import { Stats } from "@react-three/drei";
 import Crosshair from "../components/ui/Crosshair.jsx";
 import { useGameStore } from "../store/useGameStore.js";
 import ChatPanel from "./ChatPanel.jsx";
-import WatchTogether from "./WatchTogether.jsx";
+import WatchTogetherInterface from "./WatchTogetherInterface.jsx";
 
 // ?react is a vite query suffix that tells the svg plug (vite-plugin0svgr) to transform the svg into a React component
 import HelpIcon from "../assets/icons/help_outline.svg?react"; 
@@ -413,7 +413,8 @@ const GameOverlay = () => {
             </div>
 
             <ChatPanel />
-            {watchTogetherOpen ? <WatchTogether /> : null}
+            {watchTogetherOpen ? <WatchTogetherInterface /> : null}
+            {/* <WatchTogetherInterface /> */}
         </div>
     )
 }

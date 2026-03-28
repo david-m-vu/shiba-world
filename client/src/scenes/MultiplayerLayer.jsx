@@ -3,7 +3,7 @@
  * Responsible for rendering all the Avatars including the current player's, NameTags, SpeechBubbles...
  */
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { useRapier } from "@react-three/rapier";
@@ -11,6 +11,7 @@ import { Euler, Quaternion, Vector3 } from "three";
 
 import Avatar from "../components/Avatar.jsx";
 import RemoteAvatar from "../components/RemoteAvatar.jsx";
+import InteractHint from "../components/InteractHint.jsx";
 
 import { useGameStore } from "../store/useGameStore.js";
 import { useRemotePlayers } from "../hooks/useRemotePlayers.js";
@@ -37,6 +38,7 @@ const PLAYER_SYNC_ROTATION_EPSILON = 0.03;
 
 const KIOSK_INTERACT_RADIUS = 2.25;
 const KIOSK_INTERACT_POSITION = [0, 0, 3];
+const KIOSK_HINT_Y = 2.25;
 
 const WATCH_CAMERA_POSITION = [0, 15, 3];
 const WATCH_CAMERA_TARGET = [0, 10, 30];
@@ -104,6 +106,7 @@ const MultiplayerLayer = () => {
     // also updates on null
     const lastSentStateRef = useRef(null); 
     const isNearKioskRef = useRef(false);
+    const [isNearKiosk, setIsNearKiosk] = useState(false);
 
     // get hooks for player / camera movement 
     const {
@@ -371,7 +374,14 @@ const MultiplayerLayer = () => {
 
         const deltaX = localPosition.x - KIOSK_INTERACT_POSITION[0];
         const deltaZ = localPosition.z - KIOSK_INTERACT_POSITION[2];
-        isNearKioskRef.current = Math.hypot(deltaX, deltaZ) <= KIOSK_INTERACT_RADIUS;
+        const nearKioskNow = Math.hypot(deltaX, deltaZ) <= KIOSK_INTERACT_RADIUS;
+        const wasNearKiosk = isNearKioskRef.current;
+        isNearKioskRef.current = nearKioskNow;
+
+        // if avatar is near the kiosk (nearKioskNow) but previously wasn't (wasNearKiosk), update isNearKiosk state to trigger rerender
+        if (wasNearKiosk !== nearKioskNow) {
+            setIsNearKiosk(nearKioskNow);
+        }
 
         if (!selfPlayerId) {
             return;
@@ -473,6 +483,13 @@ const MultiplayerLayer = () => {
             {remotePlayers.map((player) => (
                 <RemoteAvatar key={player.id} player={player} />
             ))}
+
+            {isNearKiosk ? (
+                <InteractHint 
+                    position={[KIOSK_INTERACT_POSITION[0], KIOSK_HINT_Y, KIOSK_INTERACT_POSITION[2]]}
+                    text={"Press E to open Watch_3_Gether"}
+                />
+            ) : null}
         </>
     )
 }
