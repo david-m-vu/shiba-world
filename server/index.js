@@ -9,14 +9,20 @@ import http from "node:http";
 import cors from "cors";
 import express from "express";
 import morgan from "morgan";
+import dotenv from "dotenv";
 import { Server } from "socket.io";
 
+import youtubeRoutes from "./routes/youtube.js";
+import roomRoutes from "./routes/rooms.js";
+
 import { registerSocketHandlers } from "./socket/handlers.js";
-import { roomExists } from "./world/rooms.js";
+
+dotenv.config();
 
 // note render sets an environment variable named PORT for our web service at runtime
 const PORT = Number(process.env.PORT ?? 3001);
 const SHUTDOWN_GRACE_PERIOD_MS = Number(process.env.SHUTDOWN_GRACE_PERIOD_MS ?? 10000);
+
 let isShuttingDown = false;
 const normalizeOrigin = (value) => {
     try {
@@ -65,6 +71,9 @@ app.use(cors({
     credentials: true,
 }));
 
+app.use("/api/rooms", roomRoutes);
+app.use("/api/youtube", youtubeRoutes);
+
 app.get("/health", (_request, response) => {
     if (isShuttingDown) {
         response.status(503).json({
@@ -78,25 +87,6 @@ app.get("/health", (_request, response) => {
     response.json({
         ok: true,
         service: "shiba-world-server",
-    });
-});
-
-app.get("/api/rooms/:roomId/exists", (request, response) => {
-    const roomId = String(request.params.roomId ?? "").trim();
-    if (!roomId) {
-        response.status(400).json({
-            ok: false,
-            exists: false,
-            roomId: null,
-            message: "Room ID is required.",
-        });
-        return;
-    }
-
-    response.json({
-        ok: true,
-        exists: roomExists(roomId),
-        roomId,
     });
 });
 

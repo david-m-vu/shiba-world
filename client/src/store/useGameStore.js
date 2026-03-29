@@ -332,7 +332,11 @@ export const useGameStore = create(
             infiniteJumpEnabled: false,
             debugModeEnabled: false,
             resetCharacterRequestId: 0,
+            
+            // watch together state
             watchTogetherOpen: false,
+            youtubeSearchInput: "",
+            youtubeSearchResults: [],
 
             localPlayerName: "",
             currentRoomId: null,
@@ -422,11 +426,19 @@ export const useGameStore = create(
             requestResetCharacter: () => {
                 set((state) => ({ resetCharacterRequestId: state.resetCharacterRequestId + 1 }));
             },
+            
+            
             openWatchTogether: () => {
                 set({ watchTogetherOpen: true });
             },
             closeWatchTogether: () => {
                 set({ watchTogetherOpen: false });
+            },
+            setYoutubeSearchInput: (input) => {
+                set({ youtubeSearchInput: input })
+            },
+            setYoutubeSearchResults: (results) => {
+                set({ youtubeSearchResults: results })
             },
 
             setSocketListenersReady: (socketListenersReady) => {
