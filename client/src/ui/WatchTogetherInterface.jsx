@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useGameStore } from "../store/useGameStore.js";
 
 import SearchIcon from "../assets/icons/search.svg?react"
@@ -6,6 +6,51 @@ import CloseIcon from "../assets/icons/close.svg?react";
 import ShibaInuFace from "../assets/icons/shiba-inu.png"
 
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
+const YOUTUBE_IFRAME_API_URL = "https://www.youtube.com/iframe_api";
+const YOUTUBE_IFRAME_PROMISE_KEY = "__shibaWorldYoutubeIframeApiPromise"; // used to store the promise that loads the youtube iframe api
+
+const getYoutubeIframeApi = () => {
+    if (typeof window === "undefined") {
+        return Promise.reject(new Error("Window is unavailable."));
+    }
+
+    // if the youtube API has already been loaded
+    if (window.YT?.Player) {
+        return Promise.resolve(window.YT);
+    }
+
+    // if promise has already been created
+    if (window[YOUTUBE_IFRAME_PROMISE_KEY]) {
+        return window[YOUTUBE_IFRAME_PROMISE_KEY];
+    }
+
+    window[YOUTUBE_IFRAME_PROMISE_KEY] = new Promise((resolve, reject) => {
+        const previousOnReady = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = () => {
+            if (typeof previousOnReady === "function") {
+                previousOnReady();
+            }
+            // signal that the API loaded. we .then this promise, then initialize YT.Player once everything is in place
+            resolve(window.YT);
+        };
+
+        const existingScript = document.querySelector(`script[src="${YOUTUBE_IFRAME_API_URL}"]`);
+        if (existingScript) {
+            return;
+        }
+
+        const script = document.createElement("script");
+        script.src = YOUTUBE_IFRAME_API_URL;
+        script.async = true;
+        script.onerror = () => {
+            reject(new Error("Failed to load YouTube IFrame API."));
+        };
+
+        document.head.appendChild(script);
+    });
+
+    return window[YOUTUBE_IFRAME_PROMISE_KEY];
+};
 
 const tempSearchResults = {
     "ok": true,
@@ -524,13 +569,35 @@ const formatVideoDuration = (duration) => {
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
 };
 
+
+
+
+
+
 const WatchTogetherInterface = ({ isOpen }) => {
     const [isSearching, setIsSearching] = useState(false);
     const [searchError, setSearchError] = useState("");
     const [searchInput, setSearchInput] = useState("");
     const [searchResults, setSearchResults] = useState([]);
 
+    const [videoQueue, setVideoQueue] = useState([]);
+    const [currentQueueIndex, setCurrentQueueIndex] = useState(-1); // currentQeueueIndex -1 means theres nothing in the queue or nothing is selected - representsindex of the video currently playing
+
+    const [playerError, setPlayerError] = useState("");
+
     const panelRef = useRef(null);
+    const playerHostRef = useRef(null); // the div where the youtube iframe will be placed
+    const playerRef = useRef(null);
+    const playerReadyRef = useRef(false);
+
+    const pendingVideoIdRef = useRef(""); // represents the "latest desired video" buffer for timing gaps - exists because currentVideoId can change before YT player is ready
+    const videoQueueRef = useRef([]);
+
+    const closeWatchTogether = useGameStore((state) => state.closeWatchTogether);
+
+    const hasQueuedVideos = videoQueue.length > 0;
+    const currentQueuedVideo = currentQueueIndex >= 0 ? (videoQueue[currentQueueIndex] ?? null) : null;
+    const currentVideoId = currentQueuedVideo?.videoId ?? "";
     
     // blur any currently focused element inside the panel
     const blurFocusedPanelElement = () => {
@@ -545,14 +612,18 @@ const WatchTogetherInterface = ({ isOpen }) => {
         }
     };
 
-    const closeWatchTogether = useGameStore((state) => state.closeWatchTogether);
+    useEffect(() => {
+        videoQueueRef.current = videoQueue;
+    }, [videoQueue]);
 
+    // blur any focused element when WatchTogetherInterface is closed
     useEffect(() => {
         if (!isOpen) {
             blurFocusedPanelElement();
         }
     }, [isOpen]);
 
+    // set event listener for escape press to close WatchTogetherInterface
     useEffect(() => {
         if (!isOpen) {
             return;
@@ -574,8 +645,183 @@ const WatchTogetherInterface = ({ isOpen }) => {
         };
     }, [closeWatchTogether, isOpen]);
 
+    // keeps current queue index valid whenever the queue length changes
+    // ex: if queue length shrinks and index is out of bounds --> clamp to last valid index
+    useEffect(() => {
+        if (videoQueue.length === 0) {
+            setCurrentQueueIndex(-1);
+            return;
+        }
+
+        setCurrentQueueIndex((previousIndex) => {
+            if (previousIndex < 0) {
+                return 0;
+            }
+            if (previousIndex >= videoQueue.length) {
+                return videoQueue.length - 1;
+            }
+            return previousIndex;
+        });
+    }, [videoQueue.length]);
+
+    // destroy the youtbe player if there is nothing to play (hasQueuedVideos === false)
+    useEffect(() => {
+        if (hasQueuedVideos) {
+            return;
+        }
+
+        if (playerRef.current) {
+            playerRef.current.destroy();
+            playerRef.current = null;
+        }
+
+        playerReadyRef.current = false;
+        pendingVideoIdRef.current = "";
+    }, [hasQueuedVideos]);
+
+    // create the player and play the first video if the user queued videos
+    useEffect(() => {
+        if (!hasQueuedVideos || !playerHostRef.current || playerRef.current) {
+            return;
+        }
+
+        // cancelled is set to true if component suddenly unmounts (useful while player is loading)
+        let cancelled = false;
+
+        getYoutubeIframeApi()
+            .then((YT) => {
+                if (cancelled || !playerHostRef.current || playerRef.current) {
+                    return;
+                }
+
+                playerRef.current = new YT.Player(playerHostRef.current, {
+                    width: "100%",
+                    height: "100%",
+                    playerVars: {
+                        controls: 1,
+                        disablekb: 1,
+                        fs: 0,
+                        playsinline: 1,
+                    },
+                    events: {
+                        onReady: () => {
+                            playerReadyRef.current = true;
+
+                            // pendingVideoIdRef.current is falsy when video that the player loaded is caught up to currentVideoId
+                            const nextVideoId = pendingVideoIdRef.current || currentVideoId;
+                            if (nextVideoId) {
+                                playerRef.current?.loadVideoById(nextVideoId);
+                                pendingVideoIdRef.current = "";
+                            }
+                        },
+                        onStateChange: (event) => {
+                            // only handle case where the video ended - to autoplay next video (if next video exists)
+                            if (event.data !== window.YT.PlayerState.ENDED) {
+                                return;
+                            }
+
+                            setCurrentQueueIndex((previousIndex) => {
+                                const nextIndex = previousIndex + 1;
+                                // this is true when no valid current video is selected (-1 state), or we're already at the last qeuued video so advancing would go out of bounds
+                                if (previousIndex < 0 || nextIndex >= videoQueueRef.current.length) {
+                                    return previousIndex;
+                                }
+                                return nextIndex;
+                            });
+                        },
+                    },
+                });
+            })
+            .catch((error) => {
+                if (cancelled) {
+                    return;
+                }
+
+                setPlayerError(error instanceof Error ? error.message : "Failed to load YouTube player.");
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [currentVideoId, hasQueuedVideos]);
+
+    // update video that the player loads and plays based on the currentVideoId state
+    useEffect(() => {
+        if (!currentVideoId) {
+            return;
+        }
+
+        // why this exists:
+        // stores the target video while player is still booting
+        // if currentVideoId changes before onReady, pending is updated to the latest id
+        pendingVideoIdRef.current = currentVideoId;
+
+        // when the first video is queued, the player hasn't loaded yet
+        // so we avoid loading the video twice since the player onVideo
+            // note race condition with the player init useEffect is effectively not possible because the promise HAS to run first, and that's async
+            // thread will then transfer focus over to this useEffect
+        if (!playerRef.current || !playerReadyRef.current) {
+            return;
+        }
+
+        // loadedVideoId = true loaded video that player is currently playing
+        // currentVideoId is the video id of the state
+        const loadedVideoId = String(playerRef.current.getVideoData?.()?.video_id ?? "");
+        console.log(loadedVideoId)
+
+        // these differ when React state has moved to a new target video but the YT player is still on the old one (or none yet)
+        if (loadedVideoId === currentVideoId) {
+            pendingVideoIdRef.current = "";
+            return;
+        }
+
+        playerRef.current.loadVideoById(currentVideoId);
+        pendingVideoIdRef.current = "";
+    }, [currentVideoId]);
+
+    // handle player cleanup when component unmounts
+    useEffect(() => {
+        return () => {
+            if (playerRef.current) {
+                playerRef.current.destroy();
+                playerRef.current = null;
+            }
+
+            playerReadyRef.current = false;
+            pendingVideoIdRef.current = "";
+        };
+    }, []);
+
+    const handleQueueVideo = useCallback((video) => {
+        if (!video?.videoId) {
+            return;
+        }
+
+        setPlayerError("");
+        setVideoQueue((previousQueue) => [...previousQueue, video]);
+        setCurrentQueueIndex((previousIndex) => (previousIndex < 0 ? 0 : previousIndex));
+    }, []);
+
+    const handleQueueItemClick = useCallback((queueIndex) => {
+        const safeQueueIndex = Number(queueIndex);
+        if (!Number.isInteger(safeQueueIndex)) {
+            return;
+        }
+
+        if (safeQueueIndex < 0 || safeQueueIndex >= videoQueueRef.current.length) {
+            return;
+        }
+
+        setCurrentQueueIndex(safeQueueIndex);
+    }, []);
+
     const handleSubmit = async (event) => {
         event.preventDefault();
+
+        if (isSearching) {
+            return;
+        }
+
         const safeQuery = searchInput.trim();
         if (!safeQuery) {
             setSearchResults([]);
@@ -622,6 +868,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
             <li key={video.videoId} className="h-full">
                 <button
                     type="button"
+                    onClick={() => handleQueueVideo(video)}
                     className="group w-full h-full flex items-start text-left rounded-lg border border-white/10 bg-white/3 p-2 
                         hover:bg-white/7 transition-colors cursor-pointer"
                 >
@@ -632,7 +879,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
                                     className="w-full h-full object-cover transition-transform duration-300 ease-out group-hover:scale-105"
                                     src={video.thumbnailUrl}
                                     alt={video.title || "YouTube thumbnail"}
-                                    loading="lazy"
+                                    loading="lazy" // tells browser to delay loading this image until it's near the viewport instead of loading immediately
                                 />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-[11px] bg-black/40 text-white/60">
@@ -651,7 +898,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
                                 </span>
                             </div>
                             {formatVideoDuration(video.duration) && (
-                                <span className="absolute z-20 right-1 bottom-1 rounded bg-black/80 px-1 py-0.5 text-[0.625rem] leading-none text-white">
+                                <span className="absolute z-20 right-1 bottom-1 rounded bg-black/80 px-1 py-0.5 text-xs leading-none text-white">
                                     {formatVideoDuration(video.duration)}
                                 </span>
                             )}
@@ -672,7 +919,82 @@ const WatchTogetherInterface = ({ isOpen }) => {
                 </button>
             </li>
         ));
-    }, [searchResults]);
+    }, [handleQueueVideo, searchResults]);
+
+    const renderedQueueItems = useMemo(() => {
+        return videoQueue.map((video, queueIndex) => {
+            const isNowPlaying = queueIndex === currentQueueIndex;
+            return (
+                <li key={`${video.videoId}-${queueIndex}`}>
+                    <button
+                        type="button"
+                        onClick={() => handleQueueItemClick(queueIndex)}
+                        className={`w-full rounded-lg border p-2 text-left transition-colors cursor-pointer ${
+                            isNowPlaying
+                                ? "border-primary/70 bg-primary/12 hover:bg-primary/16"
+                                : "border-white/10 bg-white/3 hover:bg-white/7"
+                        }`}
+                    >
+                        <div className="flex flex-row gap-3 h-20">
+                            <div className="relative h-full shrink-0 overflow-hidden rounded-md bg-black/40 aspect-video">
+                                {video.thumbnailUrl ? (
+                                    <img
+                                        className="w-full h-full object-cover"
+                                        src={video.thumbnailUrl}
+                                        alt={video.title || "Queue thumbnail"}
+                                        loading="lazy" // tells browser to delay loading this image until it's near the viewport instead of loading immediately
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-[11px] text-white/60">
+                                        No thumbnail
+                                    </div>
+                                )}
+                                {formatVideoDuration(video.duration) && (
+                                    <span className="absolute z-20 right-1 bottom-1 rounded bg-black/80 px-1 py-0.5 text-xs leading-none text-white">
+                                        {formatVideoDuration(video.duration)}
+                                    </span>
+                                )}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium leading-5 line-clamp-2">
+                                    {video.title || "Untitled video"}
+                                </p>
+                                <p className="mt-1 text-xs text-white/75 truncate">
+                                    {video.channelTitle || "Unknown channel"}
+                                </p>
+                                {/* <p className="mt-1 text-xs text-white/60 truncate">
+                                    {formatViews(video.viewCount)} • {formatPublishedAgo(video.publishedAt)}
+                                </p> */}
+                            </div>
+                        </div>
+                    </button>
+                </li>
+            );
+        });
+    }, [currentQueueIndex, handleQueueItemClick, videoQueue]);
+
+    const searchContent = (
+        <>
+            {isSearching && (
+                <p className="text-sm text-white/70">Searching...</p>
+            )}
+
+            {!isSearching && searchError && (
+                <p className="text-sm text-red-300">{searchError}</p>
+            )}
+
+            {!isSearching && !searchError && searchResults.length === 0 && (
+                <p className="text-sm text-white/70">Search for a YouTube video to see results.</p>
+            )}
+
+            {!isSearching && !searchError && searchResults.length > 0 && (
+                <ul className={`grid gap-3 ${hasQueuedVideos ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
+                    {renderedSearchResults}
+                </ul>
+            )}
+        </>
+    );
 
     return (
         <div
@@ -714,6 +1036,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
                             />
                             <button 
                                 type="submit"
+                                disabled={isSearching}
                                 aria-label="Search videos"
                                 className="hover:cursor-pointer w-14 bg-[rgba(94,94,94,0.6)] rounded-r-full rounded-l-none flex items-center justify-center
                                     transition-colors duration-100 hover:bg-[rgba(94,94,94,0.8)] active:bg-[rgba(94,94,94,0.6)]"
@@ -735,30 +1058,39 @@ const WatchTogetherInterface = ({ isOpen }) => {
                     </button>
                 </div>
 
-                {/* search results */}
-                <div className="font-['Roboto'] mt-4 flex-1 min-h-0 overflow-y-auto pr-1 app-scroll">
-                    {isOpen ? (
-                        <>
-                            {isSearching && (
-                                <p className="text-sm text-white/70">Searching...</p>
-                            )}
+                {/* if queuedVideos, left side player + queue - right side search results. Else, all search results */}
+                {hasQueuedVideos ? (
+                    <div className="font-['Roboto'] mt-4 flex-1 min-h-0 grid grid-cols-1 gap-4 xs:grid-cols-[minmax(20rem,1.1fr)_minmax(0,2fr)]">
+                        <div className="min-h-0 flex flex-col">
+                            <div className="w-full overflow-hidden rounded-lg border border-white/20 bg-black aspect-video">
+                                <div ref={playerHostRef} className="w-full h-full" />
+                            </div>
 
-                            {!isSearching && searchError && (
-                                <p className="text-sm text-red-300">{searchError}</p>
-                            )}
+                            {playerError ? (
+                                <p className="mt-2 text-sm text-red-300">{playerError}</p>
+                            ) : null}
 
-                            {!isSearching && !searchError && searchResults.length === 0 && (
-                                <p className="text-sm text-white/70">Search for a YouTube video to see results.</p>
-                            )}
+                            <div className="mt-3 flex items-center justify-between gap-3">
+                                <p className="text-sm font-medium text-white/90">Queue</p>
+                                <p className="text-xs uppercase tracking-wide text-white/60">{videoQueue.length} videos</p>
+                            </div>
 
-                            {!isSearching && !searchError && searchResults.length > 0 && (
-                                <ul className="grid grid-cols-1 gap-3 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-                                    {renderedSearchResults}
+                            <div className="mt-2 flex-1 min-h-0 overflow-y-auto pr-1 app-scroll">
+                                <ul className="flex flex-col gap-2">
+                                    {renderedQueueItems}
                                 </ul>
-                            )}
-                        </>
-                    ) : null}
-                </div>
+                            </div>
+                        </div>
+
+                        <div className="min-h-0 overflow-y-auto pr-1 app-scroll">
+                            {isOpen ? searchContent : null}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="font-['Roboto'] mt-4 flex-1 min-h-0 overflow-y-auto pr-1 app-scroll">
+                        {isOpen ? searchContent : null}
+                    </div>
+                )}
             </section>
         </div>
     );
