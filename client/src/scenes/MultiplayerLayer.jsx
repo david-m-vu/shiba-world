@@ -40,8 +40,8 @@ const KIOSK_INTERACT_RADIUS = 2.25;
 const KIOSK_INTERACT_POSITION = [0, 0, 3];
 const KIOSK_HINT_Y = 2.25;
 
-const WATCH_CAMERA_POSITION = [0, 15, 3];
-const WATCH_CAMERA_TARGET = [0, 10, 30];
+const WATCH_CAMERA_POSITION = [0, 15, -8]; // orig 0,15,3
+const WATCH_CAMERA_TARGET = [0, 0, 20]; // orig 0,10,30
 const WATCH_CAMERA_LERP_SPEED = 2;
 const WATCH_CAMERA_BACK_LERP_SPEED = 15;
 
@@ -249,7 +249,7 @@ const MultiplayerLayer = () => {
     }, [jumpQueuedRef, keysRef, watchTogetherOpen]);
 
     useEffect(() => {
-        // if watch together is open but it wasn't before
+        // if watch together is open but it wasn't before (open)
         if (watchTogetherOpen && !wasWatchTogetherOpenRef.current) {
             // Snapshot camera pose before entering watch mode.
             preWatchCameraPositionRef.copy(camera.position);
@@ -263,7 +263,7 @@ const MultiplayerLayer = () => {
             shouldReturnToPreWatchCameraRef.current = false;
         }
 
-        // if watch together wasn't open and it was open before
+        // if watch together wasn't open and it was open before (close)
         if (!watchTogetherOpen && wasWatchTogetherOpenRef.current) {
             // Start return transition when watch mode closes.
             shouldReturnToPreWatchCameraRef.current = true;

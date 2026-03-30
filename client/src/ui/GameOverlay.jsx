@@ -413,7 +413,7 @@ const GameOverlay = () => {
             </div>
 
             <ChatPanel />
-            {watchTogetherOpen ? <WatchTogetherInterface /> : null}
+            <WatchTogetherInterface isOpen={watchTogetherOpen} />
             {/* <WatchTogetherInterface /> */}
         </div>
     )

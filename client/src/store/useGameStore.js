@@ -335,8 +335,6 @@ export const useGameStore = create(
             
             // watch together state
             watchTogetherOpen: false,
-            youtubeSearchInput: "",
-            youtubeSearchResults: [],
 
             localPlayerName: "",
             currentRoomId: null,
@@ -433,12 +431,6 @@ export const useGameStore = create(
             },
             closeWatchTogether: () => {
                 set({ watchTogetherOpen: false });
-            },
-            setYoutubeSearchInput: (input) => {
-                set({ youtubeSearchInput: input })
-            },
-            setYoutubeSearchResults: (results) => {
-                set({ youtubeSearchResults: results })
             },
 
             setSocketListenersReady: (socketListenersReady) => {

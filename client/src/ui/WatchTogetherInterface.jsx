@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useGameStore } from "../store/useGameStore.js";
 
+import SearchIcon from "../assets/icons/search.svg?react"
 import CloseIcon from "../assets/icons/close.svg?react";
 import ShibaInuFace from "../assets/icons/shiba-inu.png"
 
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
-const SEARCH_INPUT_SYNC_DEBOUNCE_MS = 150;
 
 const tempSearchResults = {
     "ok": true,
@@ -524,47 +524,40 @@ const formatVideoDuration = (duration) => {
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
 };
 
-const WatchTogetherInterface = () => {
+const WatchTogetherInterface = ({ isOpen }) => {
     const [isSearching, setIsSearching] = useState(false);
     const [searchError, setSearchError] = useState("");
+    const [searchInput, setSearchInput] = useState("");
+    const [searchResults, setSearchResults] = useState([]);
+
+    const panelRef = useRef(null);
+    
+    // blur any currently focused element inside the panel
+    const blurFocusedPanelElement = () => {
+        // if focus is on the Document itself or body/html, can fail strict HTMLElement assumptions,
+        // or another example is if focus is inside SVG element (SVGElement, not HTMLElement)
+        if (!(document.activeElement instanceof HTMLElement)) {
+            return;
+        }
+
+        if (panelRef.current?.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+    };
 
     const closeWatchTogether = useGameStore((state) => state.closeWatchTogether);
-    const youtubeSearchInput = useGameStore((state) => state.youtubeSearchInput);
-    const youtubeSearchResults = useGameStore((state) => state.youtubeSearchResults);
-    const setYoutubeSearchInput = useGameStore((state) => state.setYoutubeSearchInput);
-    const setYoutubeSearchResults = useGameStore((state) => state.setYoutubeSearchResults);
 
-    const [draftQuery, setDraftQuery] = useState(youtubeSearchInput);
-
-    // use for immediate flush
-    const commitDraftQuery = useCallback(() => {
-        if (youtubeSearchInput !== draftQuery) {
-            setYoutubeSearchInput(draftQuery);
+    useEffect(() => {
+        if (!isOpen) {
+            blurFocusedPanelElement();
         }
-    }, [draftQuery, setYoutubeSearchInput, youtubeSearchInput]);
-
-
-    // keep local state in sync with global state
-    useEffect(() => {
-        setDraftQuery(youtubeSearchInput);
-    }, [youtubeSearchInput]);
-
-    // debounced version of commitDraftQuery
-    useEffect(() => {
-        // after SEARCH_INPUT_SYNC_DEBOUNCE_MS, copy draftQuery into global state
-        // if you type again before timer finishes, cleanup cancels the old timer and starts a new one
-        const timeoutId = window.setTimeout(() => {
-            if (youtubeSearchInput !== draftQuery) {
-                setYoutubeSearchInput(draftQuery);
-            }
-        }, SEARCH_INPUT_SYNC_DEBOUNCE_MS);
-
-        return () => {
-            window.clearTimeout(timeoutId);
-        };
-    }, [draftQuery, setYoutubeSearchInput, youtubeSearchInput]);
+    }, [isOpen]);
 
     useEffect(() => {
+        if (!isOpen) {
+            return;
+        }
+
         const handleEscapeToClose = (event) => {
             if (event.key !== "Escape") {
                 return;
@@ -572,7 +565,6 @@ const WatchTogetherInterface = () => {
 
             event.preventDefault();
             event.stopPropagation();
-            commitDraftQuery();
             closeWatchTogether();
         };
 
@@ -580,14 +572,13 @@ const WatchTogetherInterface = () => {
         return () => {
             window.removeEventListener("keydown", handleEscapeToClose, true);
         };
-    }, [closeWatchTogether, commitDraftQuery]);
+    }, [closeWatchTogether, isOpen]);
 
     const handleSubmit = async (event) => {
         event.preventDefault();
-        commitDraftQuery();
-        const safeQuery = draftQuery.trim();
+        const safeQuery = searchInput.trim();
         if (!safeQuery) {
-            setYoutubeSearchResults([]);
+            setSearchResults([]);
             setSearchError("");
             return;
         }
@@ -604,12 +595,16 @@ const WatchTogetherInterface = () => {
             //     throw new Error(errorMessage);
             // }
 
-            const payload = tempSearchResults;
+            const payload = await new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve(tempSearchResults);
+                }, 1000)
+            })
 
             const safeItems = Array.isArray(payload.items) ? payload.items : [];
-            setYoutubeSearchResults(safeItems);
+            setSearchResults(safeItems);
         } catch (error) {
-            setYoutubeSearchResults([]);
+            setSearchResults([]);
             setSearchError(error instanceof Error ? error.message : "Failed to fetch YouTube videos.");
         } finally {
             setIsSearching(false);
@@ -617,20 +612,20 @@ const WatchTogetherInterface = () => {
     };
 
     const handleClose = () => {
-        commitDraftQuery();
         closeWatchTogether();
     };
 
     // since input keystrokes update component state, we don't want to rerender the entire search results
-    // without useMemo, every render rebuilds all result card JSX with map() even when youtubeSearchResults didn't change
+    // without useMemo, every render rebuilds all result card JSX with map() even when searchResults didn't change
     const renderedSearchResults = useMemo(() => {
-        return youtubeSearchResults.map((video) => (
+        return searchResults.map((video) => (
             <li key={video.videoId} className="h-full">
                 <button
                     type="button"
-                    className="group w-full h-full text-left rounded-lg border border-white/10 bg-white/3 p-2 hover:bg-white/7 transition-colors cursor-pointer flex items-start"
+                    className="group w-full h-full flex items-start text-left rounded-lg border border-white/10 bg-white/3 p-2 
+                        hover:bg-white/7 transition-colors cursor-pointer"
                 >
-                    <div className="flex flex-col gap-2 ">
+                    <div className="flex flex-col gap-2 w-full">
                         <div className="relative w-full aspect-video rounded-md overflow-hidden">
                             {video.thumbnailUrl ? (
                                 <img
@@ -677,11 +672,20 @@ const WatchTogetherInterface = () => {
                 </button>
             </li>
         ));
-    }, [youtubeSearchResults]);
+    }, [searchResults]);
 
     return (
-        <div className="pointer-events-auto absolute inset-0 z-10 flex items-center justify-center bg-[rgba(16,16,16,0.3)]">
-            <section className="relative flex flex-col w-[min(95vw,70rem)] h-[min(80vh,40rem)] rounded-lg border border-white/15 bg-[rgba(41,41,41,0.9)] p-4 text-white shadow-2xl">
+        <div
+            className={`absolute inset-0 z-10 flex items-center justify-center transition-opacity duration-200 ease-out ${
+                isOpen ? "pointer-events-auto opacity-100 bg-[rgba(16,16,16,0.3)]" : "pointer-events-none opacity-0 bg-[rgba(16,16,16,0)]"
+            }`}
+        >
+            <section
+                ref={panelRef}
+                className={`relative flex flex-col w-[min(95vw,70rem)] h-[min(80vh,40rem)] rounded-lg border border-white/15 bg-[rgba(41,41,41,0.9)] p-4 text-white shadow-2xl transition-all duration-200 ease-out ${
+                    isOpen ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
+                }`}
+            >
                 {/* headers and inputs */}
                 <div className="grid items-center gap-3 
                     grid-cols-[auto_minmax(9.5rem,1fr)_auto]
@@ -698,15 +702,24 @@ const WatchTogetherInterface = () => {
                         {/* search input */}
                         <form 
                             onSubmit={handleSubmit}
-                            className="font-['Roboto'] relative w-full max-w-lg"
+                            className="font-['Roboto'] relative w-full max-w-lg flex flex-row items-stretch"
                         >
                             <input 
                                 type="text" 
-                                value={draftQuery}
-                                onChange={(event) => setDraftQuery(event.target.value)}
-                                className="w-full p-2.5 text-xs rounded-4xl bg-[rgba(41,41,41,0.8)] border border-white/30 outline-none"
+                                value={searchInput}
+                                onChange={(event) => setSearchInput(event.target.value)}
+                                className="w-full p-2.5 text-xs rounded-l-full rounded-r-none bg-[rgba(41,41,41,0.8)] border border-white/30 outline-none
+                                     focus:border-primary transition-colors duration-100 ease-out"
                                 placeholder="Search or paste Youtube URL"
                             />
+                            <button 
+                                type="submit"
+                                aria-label="Search videos"
+                                className="hover:cursor-pointer w-14 bg-[rgba(94,94,94,0.6)] rounded-r-full rounded-l-none flex items-center justify-center
+                                    transition-colors duration-100 hover:bg-[rgba(94,94,94,0.8)] active:bg-[rgba(94,94,94,0.6)]"
+                            >
+                                <SearchIcon className="h-4 w-4 -translate-x-1"/>
+                            </button>
                         </form>
                     </div>
 
@@ -715,6 +728,7 @@ const WatchTogetherInterface = () => {
                         type="button"
                         className="w-6 h-auto justify-self-end hover:cursor-pointer 
                             transition-transform duration-150 ease-out hover:scale-[1.02] active:scale-100 hover:opacity-95 active:opacity-90"
+                        onMouseDown={(event) => event.preventDefault()} // prevent close button from taking mouse focus
                         onClick={handleClose}
                     >
                         <CloseIcon />
@@ -723,23 +737,27 @@ const WatchTogetherInterface = () => {
 
                 {/* search results */}
                 <div className="font-['Roboto'] mt-4 flex-1 min-h-0 overflow-y-auto pr-1 app-scroll">
-                    {isSearching && (
-                        <p className="text-sm text-white/70">Searching...</p>
-                    )}
+                    {isOpen ? (
+                        <>
+                            {isSearching && (
+                                <p className="text-sm text-white/70">Searching...</p>
+                            )}
 
-                    {!isSearching && searchError && (
-                        <p className="text-sm text-red-300">{searchError}</p>
-                    )}
+                            {!isSearching && searchError && (
+                                <p className="text-sm text-red-300">{searchError}</p>
+                            )}
 
-                    {!isSearching && !searchError && youtubeSearchResults.length === 0 && (
-                        <p className="text-sm text-white/70">Search for a YouTube video to see results.</p>
-                    )}
+                            {!isSearching && !searchError && searchResults.length === 0 && (
+                                <p className="text-sm text-white/70">Search for a YouTube video to see results.</p>
+                            )}
 
-                    {!isSearching && !searchError && youtubeSearchResults.length > 0 && (
-                        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                            {renderedSearchResults}
-                        </ul>
-                    )}
+                            {!isSearching && !searchError && searchResults.length > 0 && (
+                                <ul className="grid grid-cols-1 gap-3 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                                    {renderedSearchResults}
+                                </ul>
+                            )}
+                        </>
+                    ) : null}
                 </div>
             </section>
         </div>
