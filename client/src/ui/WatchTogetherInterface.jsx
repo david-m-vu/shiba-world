@@ -552,6 +552,7 @@ const formatPublishedAgo = (publishedAt) => {
 };
 
 const formatVideoDuration = (duration) => {
+    // breaks down a string like PT1H30M15S into its individual components
     const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(String(duration ?? "").trim());
     if (!match) {
         return "";
@@ -569,6 +570,72 @@ const formatVideoDuration = (duration) => {
     }
 
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
+};
+
+const YOUTUBE_VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
+const YOUTUBE_PATH_VIDEO_SEGMENTS = new Set(["embed", "shorts", "live", "v"]);
+
+/*
+ * Common valid forms put the ID at:
+ * query param v=...
+ * first segment on youtu.be/...
+ * second segment on /embed/..., /shorts/..., /live/..., /v/...
+ */
+const extractYoutubeVideoId = (inputValue) => {
+    const normalizedInput = String(inputValue ?? "").trim();
+    if (!normalizedInput) {
+        return "";
+    }
+
+    // Support direct video id input as a convenience.
+    if (YOUTUBE_VIDEO_ID_REGEX.test(normalizedInput)) {
+        return normalizedInput;
+    }
+
+    const urlCandidate = /^https?:\/\//i.test(normalizedInput)
+        ? normalizedInput
+        : `https://${normalizedInput}`;
+
+    let parsedUrl;
+    try {
+        parsedUrl = new URL(urlCandidate);
+    } catch {
+        return "";
+    }
+
+    const hostname = parsedUrl.hostname.toLowerCase().replace(/^www\./, "");
+    
+    // Ex: https://youtu.be/ArmDp-zijuc, https://www.youtube.com/shorts/ArmDp-zijuc, https://www.youtube.com/embed/ArmDp-zijuc
+    const pathSegments = parsedUrl.pathname.split("/").filter(Boolean);
+
+    // youtu.be is Youtube's official short-link domain, which usually sotres the video ID in the path
+    if (hostname === "youtu.be") {
+        const shortenedUrlVideoId = String(pathSegments[0] ?? "").trim();
+        return YOUTUBE_VIDEO_ID_REGEX.test(shortenedUrlVideoId) ? shortenedUrlVideoId : "";
+    }
+
+    const isYoutubeHost = hostname === "youtube.com"
+        || hostname.endsWith(".youtube.com")
+        || hostname === "youtube-nocookie.com"
+        || hostname.endsWith(".youtube-nocookie.com");
+
+    if (!isYoutubeHost) {
+        return "";
+    }
+
+    // check if video id exists in the v query param
+    const watchQueryVideoId = String(parsedUrl.searchParams.get("v") ?? "").trim();
+    if (YOUTUBE_VIDEO_ID_REGEX.test(watchQueryVideoId)) {
+        return watchQueryVideoId;
+    }
+
+    const maybeSegmentType = pathSegments[0];
+    const segmentVideoId = String(pathSegments[1] ?? "").trim();
+    if (!YOUTUBE_PATH_VIDEO_SEGMENTS.has(maybeSegmentType)) {
+        return "";
+    }
+
+    return YOUTUBE_VIDEO_ID_REGEX.test(segmentVideoId) ? segmentVideoId : "";
 };
 
 
@@ -594,6 +661,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
     const playerHostRef = useRef(null); // the div where the youtube iframe will be placed
     const playerRef = useRef(null);
     const playerReadyRef = useRef(false);
+    const latestSearchRequestIdRef = useRef(0);
 
     const pendingVideoIdRef = useRef(""); // represents the "latest desired video" buffer for timing gaps - exists because currentVideoId can change before YT player is ready
     const videoQueueRef = useRef([]);
@@ -923,6 +991,14 @@ const WatchTogetherInterface = ({ isOpen }) => {
         setQueueMenuPosition(null);
     }, []);
 
+    const handleClearSearch = useCallback(() => {
+        latestSearchRequestIdRef.current += 1; // invalidate in-flight searches
+        setSearchInput("");
+        setSearchResults([]);
+        setSearchError("");
+        setIsSearching(false);
+    }, []);
+
     const handleSubmit = async (event) => {
         event.preventDefault();
 
@@ -936,11 +1012,35 @@ const WatchTogetherInterface = ({ isOpen }) => {
             setSearchError("");
             return;
         }
+        const pastedVideoId = extractYoutubeVideoId(safeQuery);
+        const requestId = latestSearchRequestIdRef.current + 1;
+        latestSearchRequestIdRef.current = requestId;
 
         setIsSearching(true);
         setSearchError("");
 
         try {
+            if (pastedVideoId) {
+                const response = await fetch(`${SERVER_BASE_URL}/api/youtube/video?videoId=${encodeURIComponent(pastedVideoId)}`);
+                const payload = await response.json().catch(() => null);
+
+                if (!response.ok) {
+                    const errorMessage = String(payload?.message ?? "Failed to fetch YouTube video.");
+                    throw new Error(errorMessage);
+                }
+
+                const videoItem = payload?.item ?? null;
+                if (!videoItem?.videoId) {
+                    throw new Error("No YouTube video found for that link.");
+                }
+
+                if (requestId !== latestSearchRequestIdRef.current) {
+                    return;
+                }
+                setSearchResults([videoItem]);
+                return;
+            }
+
             // const response = await fetch(`${SERVER_BASE_URL}/api/youtube/search?q=${encodeURIComponent(safeQuery)}`);
             // const payload = await response.json().catch(() => null);
 
@@ -956,12 +1056,22 @@ const WatchTogetherInterface = ({ isOpen }) => {
             })
 
             const safeItems = Array.isArray(payload.items) ? payload.items : [];
+            if (requestId !== latestSearchRequestIdRef.current) {
+                return;
+            }
             setSearchResults(safeItems);
         } catch (error) {
+            if (requestId !== latestSearchRequestIdRef.current) {
+                return;
+            }
             setSearchResults([]);
             setSearchError(error instanceof Error ? error.message : "Failed to fetch YouTube videos.");
         } finally {
-            setIsSearching(false);
+            // this is to prevent an old request from turning off the loading state of a newer one
+            // in other words, it only lets the latest request cotrol isSearching
+            if (requestId === latestSearchRequestIdRef.current) {
+                setIsSearching(false);
+            }
         }
     };
 
@@ -1180,10 +1290,23 @@ const WatchTogetherInterface = ({ isOpen }) => {
                                 type="text" 
                                 value={searchInput}
                                 onChange={(event) => setSearchInput(event.target.value)}
-                                className="w-full p-2.5 text-xs rounded-l-full rounded-r-none bg-[rgba(41,41,41,0.8)] border border-white/30 outline-none
+                                className="w-full p-2.5 pr-8.5 text-xs rounded-l-full rounded-r-none bg-[rgba(41,41,41,0.8)] border border-white/30 outline-none
                                      focus:border-primary transition-colors duration-100 ease-out"
                                 placeholder="Search or paste Youtube URL"
                             />
+                            
+                            {searchInput.length > 0 &&
+                                <button
+                                    type="button"
+                                    aria-label="Clear search"
+                                    className="absolute top-1/2 -translate-y-1/2 right-14"
+                                    onClick={handleClearSearch}
+                                >
+                                    <CloseIcon className="w-6 h-6 cursor-pointer"/>
+                                </button>
+                            }
+                            
+
                             <button 
                                 type="submit"
                                 disabled={isSearching}

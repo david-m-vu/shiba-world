@@ -14,6 +14,8 @@ const getBestThumbnailUrl = (thumbnails) => {
         ?? null;
 };
 
+const getYoutubeApiKey = () => String(process.env.YOUTUBE_API_KEY ?? "").trim();
+
 export const searchList = async (request, response) => {
     // input validation
     const query = String(request.query.q ?? "").trim();
@@ -26,7 +28,7 @@ export const searchList = async (request, response) => {
     }
 
     // env validation
-    const youtubeApiKey = String(process.env.YOUTUBE_API_KEY ?? "").trim();
+    const youtubeApiKey = getYoutubeApiKey();
     if (!youtubeApiKey) {
         return response.status(500).json({
             ok: false,
@@ -123,3 +125,87 @@ export const searchList = async (request, response) => {
         });
     }
 }
+
+export const getVideoById = async (request, response) => {
+    const videoId = String(request.query.videoId ?? "").trim();
+    if (!videoId) {
+        return response.status(400).json({
+            ok: false,
+            message: "Query parameter 'videoId' is required.",
+            item: null,
+        });
+    }
+
+    const youtubeApiKey = getYoutubeApiKey();
+    if (!youtubeApiKey) {
+        return response.status(500).json({
+            ok: false,
+            message: "YOUTUBE_API_KEY is not configured on the server.",
+            item: null,
+        });
+    }
+
+    const videoParams = new URLSearchParams({
+        key: youtubeApiKey,
+        part: "snippet,statistics,contentDetails",
+        id: videoId,
+        maxResults: "1",
+    });
+
+    try {
+        const youtubeResponse = await fetch(`${YOUTUBE_DATA_API_VIDEOS_URL}?${videoParams.toString()}`);
+        if (!youtubeResponse.ok) {
+            const errorPayload = await youtubeResponse.json().catch(() => null);
+            return response.status(502).json({
+                ok: false,
+                message: "YouTube API request failed.",
+                status: youtubeResponse.status,
+                error: errorPayload,
+                item: null,
+            });
+        }
+
+        const payload = await youtubeResponse.json();
+        const firstVideo = Array.isArray(payload.items) ? payload.items[0] : null;
+        if (!firstVideo) {
+            return response.status(404).json({
+                ok: false,
+                message: "No YouTube video found for that videoId.",
+                item: null,
+            });
+        }
+
+        const snippet = firstVideo?.snippet ?? {};
+        const item = {
+            videoId: String(firstVideo?.id ?? "").trim(),
+            title: decode(String(snippet?.title ?? "")),
+            channelTitle: decode(String(snippet?.channelTitle ?? "")),
+            publishedAt: String(snippet?.publishedAt ?? ""),
+            thumbnailUrl: getBestThumbnailUrl(snippet?.thumbnails),
+
+            viewCount: firstVideo?.statistics?.viewCount ?? null,
+            duration: String(firstVideo?.contentDetails?.duration ?? ""),
+        };
+
+        if (!item.videoId) {
+            return response.status(404).json({
+                ok: false,
+                message: "No YouTube video found for that videoId.",
+                item: null,
+            });
+        }
+
+        return response.status(200).json({
+            ok: true,
+            item,
+        });
+        
+    } catch (error) {
+        return response.status(502).json({
+            ok: false,
+            message: "Unable to reach YouTube API.",
+            error: error instanceof Error ? error.message : "Unknown error.",
+            item: null,
+        });
+    }
+};
