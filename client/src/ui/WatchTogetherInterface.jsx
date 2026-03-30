@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useGameStore } from "../store/useGameStore.js";
 
-import SearchIcon from "../assets/icons/search.svg?react"
+import SearchIcon from "../assets/icons/search.svg?react";
+import DeleteIcon from "../assets/icons/delete.svg?react";
 import CloseIcon from "../assets/icons/close.svg?react";
-import ShibaInuFace from "../assets/icons/shiba-inu.png"
+import ShibaInuFace from "../assets/icons/shiba-inu.png";
 
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 const YOUTUBE_IFRAME_API_URL = "https://www.youtube.com/iframe_api";
@@ -582,10 +584,13 @@ const WatchTogetherInterface = ({ isOpen }) => {
 
     const [videoQueue, setVideoQueue] = useState([]);
     const [currentQueueIndex, setCurrentQueueIndex] = useState(-1); // currentQeueueIndex -1 means theres nothing in the queue or nothing is selected - representsindex of the video currently playing
+    const [openQueueMenuIndex, setOpenQueueMenuIndex] = useState(null);
+    const [queueMenuPosition, setQueueMenuPosition] = useState(null);
 
     const [playerError, setPlayerError] = useState("");
 
     const panelRef = useRef(null);
+    const queueMenuRef = useRef(null);
     const playerHostRef = useRef(null); // the div where the youtube iframe will be placed
     const playerRef = useRef(null);
     const playerReadyRef = useRef(false);
@@ -620,6 +625,8 @@ const WatchTogetherInterface = ({ isOpen }) => {
     useEffect(() => {
         if (!isOpen) {
             blurFocusedPanelElement();
+            setOpenQueueMenuIndex(null);
+            setQueueMenuPosition(null);
         }
     }, [isOpen]);
 
@@ -644,6 +651,39 @@ const WatchTogetherInterface = ({ isOpen }) => {
             window.removeEventListener("keydown", handleEscapeToClose, true);
         };
     }, [closeWatchTogether, isOpen]);
+
+    // attach listeners to handle the queue element menus
+    useEffect(() => {
+        if (openQueueMenuIndex === null) {
+            return;
+        }
+
+        const closeQueueMenu = () => {
+            setOpenQueueMenuIndex(null);
+            setQueueMenuPosition(null);
+        };
+
+        const handlePointerDown = (event) => {
+            // return if the current node is a descendant of the queue menu, so we don't close the menu
+            if (queueMenuRef.current?.contains(event.target)) {
+                return;
+            }
+
+            closeQueueMenu();
+        };
+
+        // third arg true means lsitener is registered in the capture phase (not the default bubble phase)
+        // capture lets the window listener catch scroll events from nested scrollable elements too
+        window.addEventListener("pointerdown", handlePointerDown, true);
+        window.addEventListener("scroll", closeQueueMenu, true);
+        window.addEventListener("resize", closeQueueMenu);
+
+        return () => {
+            window.removeEventListener("pointerdown", handlePointerDown, true);
+            window.removeEventListener("scroll", closeQueueMenu, true);
+            window.removeEventListener("resize", closeQueueMenu);
+        };
+    }, [openQueueMenuIndex]);
 
     // keeps current queue index valid whenever the queue length changes
     // ex: if queue length shrinks and index is out of bounds --> clamp to last valid index
@@ -815,6 +855,74 @@ const WatchTogetherInterface = ({ isOpen }) => {
         setCurrentQueueIndex(safeQueueIndex);
     }, []);
 
+    const handleQueueMenuToggle = useCallback((queueIndex, anchorElement) => {
+        const safeQueueIndex = Number(queueIndex);
+        if (!Number.isInteger(safeQueueIndex)) {
+            return;
+        }
+
+        if (!(anchorElement instanceof HTMLElement)) {
+            return;
+        }
+
+        if (openQueueMenuIndex === safeQueueIndex) {
+            setOpenQueueMenuIndex(null);
+            setQueueMenuPosition(null);
+            return;
+        }
+
+        // position the queue menu relative to the given anchorElement
+        const anchorRect = anchorElement.getBoundingClientRect();
+        setQueueMenuPosition({
+            left: anchorRect.left,
+            top: anchorRect.top,
+        });
+        setOpenQueueMenuIndex(safeQueueIndex);
+
+    }, [openQueueMenuIndex]);
+
+    const handleQueueItemDelete = useCallback((queueIndex) => {
+        const safeQueueIndex = Number(queueIndex);
+        if (!Number.isInteger(safeQueueIndex)) {
+            return;
+        }
+
+        setVideoQueue((previousQueue) => {
+            if (safeQueueIndex < 0 || safeQueueIndex >= previousQueue.length) {
+                return previousQueue;
+            }
+
+            const nextQueue = previousQueue.filter((_video, index) => index !== safeQueueIndex);
+
+            setCurrentQueueIndex((previousIndex) => {
+                if (nextQueue.length === 0) {
+                    return -1;
+                }
+
+                if (previousIndex < 0) {
+                    return 0;
+                }
+
+                // handles the case where deleted video is the current video
+                if (previousIndex === safeQueueIndex) {
+                    return Math.min(safeQueueIndex, nextQueue.length - 1);
+                }
+
+                // if the video to delete comes before the curernt video, shift the current video index back by 1
+                if (previousIndex > safeQueueIndex) {
+                    return previousIndex - 1;
+                }
+
+                return previousIndex;
+            });
+
+            return nextQueue;
+        });
+
+        setOpenQueueMenuIndex(null);
+        setQueueMenuPosition(null);
+    }, []);
+
     const handleSubmit = async (event) => {
         event.preventDefault();
 
@@ -924,55 +1032,97 @@ const WatchTogetherInterface = ({ isOpen }) => {
     const renderedQueueItems = useMemo(() => {
         return videoQueue.map((video, queueIndex) => {
             const isNowPlaying = queueIndex === currentQueueIndex;
-            return (
-                <li key={`${video.videoId}-${queueIndex}`}>
-                    <button
-                        type="button"
-                        onClick={() => handleQueueItemClick(queueIndex)}
-                        className={`w-full rounded-lg border p-2 text-left transition-colors cursor-pointer ${
-                            isNowPlaying
-                                ? "border-primary/70 bg-primary/12 hover:bg-primary/16"
-                                : "border-white/10 bg-white/3 hover:bg-white/7"
-                        }`}
-                    >
-                        <div className="flex flex-row gap-3 h-20">
-                            <div className="relative h-full shrink-0 overflow-hidden rounded-md bg-black/40 aspect-video">
-                                {video.thumbnailUrl ? (
-                                    <img
-                                        className="w-full h-full object-cover"
-                                        src={video.thumbnailUrl}
-                                        alt={video.title || "Queue thumbnail"}
-                                        loading="lazy" // tells browser to delay loading this image until it's near the viewport instead of loading immediately
-                                    />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-[11px] text-white/60">
-                                        No thumbnail
-                                    </div>
-                                )}
-                                {formatVideoDuration(video.duration) && (
-                                    <span className="absolute z-20 right-1 bottom-1 rounded bg-black/80 px-1 py-0.5 text-xs leading-none text-white">
-                                        {formatVideoDuration(video.duration)}
-                                    </span>
-                                )}
-                            </div>
 
-                            <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium leading-5 line-clamp-2">
-                                    {video.title || "Untitled video"}
-                                </p>
-                                <p className="mt-1 text-xs text-white/75 truncate">
-                                    {video.channelTitle || "Unknown channel"}
-                                </p>
-                                {/* <p className="mt-1 text-xs text-white/60 truncate">
-                                    {formatViews(video.viewCount)} • {formatPublishedAgo(video.publishedAt)}
-                                </p> */}
+            return (
+                <li 
+                    key={`${video.videoId}-${queueIndex}`}
+                    className="relative group"
+                >
+                    <div
+                        className={`flex flex-row items-center p-2 pl-0 border rounded-lg transition-colors ${
+                            isNowPlaying
+                                    ? "border-primary/70 bg-primary/12 hover:bg-primary/16 active:bg-primary/8"
+                                    : "border-white/10 bg-white/3 hover:bg-white/7 active:bg-white/5"
+                    }`}
+                    >
+                        {/* queue index */}
+                        <p className="w-6 shrink-0 text-center text-xs tabular-nums text-white/75 select-none">
+                            {queueIndex + 1}
+                        </p>
+
+                        {/* video info */}
+                        <button
+                            type="button"
+                            onClick={() => handleQueueItemClick(queueIndex)}
+                            className={`w-full pr-7 text-left hover:cursor-pointer`}
+                        >
+                            <div className="flex flex-row gap-3 h-20">
+                                <div className="relative h-full shrink-0 overflow-hidden rounded-md bg-black/40 aspect-video">
+                                    {video.thumbnailUrl ? (
+                                        <img
+                                            className="w-full h-full object-cover"
+                                            src={video.thumbnailUrl}
+                                            alt={video.title || "Queue thumbnail"}
+                                            loading="lazy" // tells browser to delay loading this image until it's near the viewport instead of loading immediately
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-[11px] text-white/60">
+                                            No thumbnail
+                                        </div>
+                                    )}
+                                    {formatVideoDuration(video.duration) && (
+                                        <span className="absolute z-20 right-1 bottom-1 rounded bg-black/80 px-1 py-0.5 text-xs leading-none text-white">
+                                            {formatVideoDuration(video.duration)}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium leading-5 line-clamp-2">
+                                        {video.title || "Untitled video"}
+                                    </p>
+                                    <p className="mt-1 text-xs text-white/75 truncate">
+                                        {video.channelTitle || "Unknown channel"}
+                                    </p>
+                                    {/* <p className="mt-1 text-xs text-white/60 truncate">
+                                        {formatViews(video.viewCount)} • {formatPublishedAgo(video.publishedAt)}
+                                    </p> */}
+                                </div>
                             </div>
-                        </div>
-                    </button>
+                        </button>
+                    </div>
+
+                    {/* queue element menu toggle */}
+                    <div className="absolute right-2 top-2">
+                        <button
+                            type="button"
+                            onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                handleQueueMenuToggle(queueIndex, event.currentTarget);
+                            }}
+                            onPointerDown={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                            }}
+                            aria-haspopup="menu" // tells screen readers this button opens a menu
+                            aria-expanded={openQueueMenuIndex === queueIndex} // tells screen reader whether the menu is currently open or closed
+                            aria-label={`Queue actions for video ${queueIndex + 1}`}
+                            className={`flex items-center justify-center h-7 w-7 rounded-[14px] border bg-gray-400/20 border-gray-300/20 text-sm leading-none transition-all
+                                cursor-pointer hover:bg-gray-300/30 hover:border-gray-200/50 active:bg-gray-500/30 active:border-gray-400/30
+                            ${
+                                openQueueMenuIndex === queueIndex
+                                    ? "opacity-100"
+                                    : "opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto"
+                            }`}
+                        >
+                            •••
+                        </button>
+                    </div>
                 </li>
             );
         });
-    }, [currentQueueIndex, handleQueueItemClick, videoQueue]);
+    }, [currentQueueIndex, handleQueueItemClick, handleQueueMenuToggle, openQueueMenuIndex, videoQueue]);
 
     const searchContent = (
         <>
@@ -1060,7 +1210,8 @@ const WatchTogetherInterface = ({ isOpen }) => {
 
                 {/* if queuedVideos, left side player + queue - right side search results. Else, all search results */}
                 {hasQueuedVideos ? (
-                    <div className="font-['Roboto'] mt-4 flex-1 min-h-0 grid grid-cols-1 gap-4 xs:grid-cols-[minmax(20rem,1.1fr)_minmax(0,2fr)]">
+                    <div className="font-['Roboto'] mt-4 flex-1 min-h-0 grid grid-cols-1 gap-4 xs:grid-cols-[minmax(20rem,2fr)_minmax(0,3fr)]">
+                        {/* player + queue */}
                         <div className="min-h-0 flex flex-col">
                             <div className="w-full overflow-hidden rounded-lg border border-white/20 bg-black aspect-video">
                                 <div ref={playerHostRef} className="w-full h-full" />
@@ -1071,8 +1222,8 @@ const WatchTogetherInterface = ({ isOpen }) => {
                             ) : null}
 
                             <div className="mt-3 flex items-center justify-between gap-3">
-                                <p className="text-sm font-medium text-white/90">Queue</p>
-                                <p className="text-xs uppercase tracking-wide text-white/60">{videoQueue.length} videos</p>
+                                <p className="text-md font-medium text-white/90">Shared Queue</p>
+                                <p className="text-xs tracking-wide text-white/60">Video {currentQueueIndex + 1}/{videoQueue.length}</p>
                             </div>
 
                             <div className="mt-2 flex-1 min-h-0 overflow-y-auto pr-1 app-scroll">
@@ -1082,16 +1233,47 @@ const WatchTogetherInterface = ({ isOpen }) => {
                             </div>
                         </div>
 
+                        {/* search content */}
                         <div className="min-h-0 overflow-y-auto pr-1 app-scroll">
                             {isOpen ? searchContent : null}
                         </div>
                     </div>
                 ) : (
+                    // search content
                     <div className="font-['Roboto'] mt-4 flex-1 min-h-0 overflow-y-auto pr-1 app-scroll">
                         {isOpen ? searchContent : null}
                     </div>
                 )}
             </section>
+
+            {isOpen && openQueueMenuIndex !== null && queueMenuPosition && typeof document !== "undefined"
+                ? createPortal(
+                    <div
+                        ref={queueMenuRef}
+                        className="font-['Roboto'] fixed z-50 min-w-40 overflow-hidden rounded-[14px] border border-white/15 bg-[rgba(22,22,22,0.95)] shadow-lg
+                            "
+                        style={{
+                            left: `${queueMenuPosition.left}px`,
+                            top: `${queueMenuPosition.top}px`,
+                        }}
+                    >
+                        <button
+                            type="button"
+                            onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                handleQueueItemDelete(openQueueMenuIndex);
+                            }}
+                            className="flex flex-row gap-2 w-full px-3 py-2 text-left text-md text-white transition-colors hover:bg-red-500/15 hover:text-red-100
+                                hover:cursor-pointer"
+                        >
+                            <DeleteIcon classname="w-6 h-6"/>
+                            <p>Delete</p>
+                        </button>
+                    </div>,
+                    document.body
+                )
+                : null}
         </div>
     );
 };
