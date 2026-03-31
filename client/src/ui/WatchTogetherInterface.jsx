@@ -4,55 +4,22 @@ import { useGameStore } from "../store/useGameStore.js";
 
 import SearchIcon from "../assets/icons/search.svg?react";
 import DeleteIcon from "../assets/icons/delete.svg?react";
+import TrendingIcon from "../assets/icons/trending.svg?react";
+import MusicNoteIcon from "../assets/icons/music_note.svg?react";
 import CloseIcon from "../assets/icons/close.svg?react";
 import ShibaInuFace from "../assets/icons/shiba-inu.png";
+import ExpandMoreIcon from "../assets/icons/expand_more.svg?react"
+
+import { getYoutubeIframeApi } from "../lib/youtubeIframeApi.js";
+import {
+    extractYoutubeVideoId,
+    formatPublishedAgo,
+    formatVideoDuration,
+    formatViews,
+} from "../lib/watchTogetherHelpers.js";
 
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
-const YOUTUBE_IFRAME_API_URL = "https://www.youtube.com/iframe_api";
-const YOUTUBE_IFRAME_PROMISE_KEY = "__shibaWorldYoutubeIframeApiPromise"; // used to store the promise that loads the youtube iframe api
-
-const getYoutubeIframeApi = () => {
-    if (typeof window === "undefined") {
-        return Promise.reject(new Error("Window is unavailable."));
-    }
-
-    // if the youtube API has already been loaded
-    if (window.YT?.Player) {
-        return Promise.resolve(window.YT);
-    }
-
-    // if promise has already been created
-    if (window[YOUTUBE_IFRAME_PROMISE_KEY]) {
-        return window[YOUTUBE_IFRAME_PROMISE_KEY];
-    }
-
-    window[YOUTUBE_IFRAME_PROMISE_KEY] = new Promise((resolve, reject) => {
-        const previousOnReady = window.onYouTubeIframeAPIReady;
-        window.onYouTubeIframeAPIReady = () => {
-            if (typeof previousOnReady === "function") {
-                previousOnReady();
-            }
-            // signal that the API loaded. we .then this promise, then initialize YT.Player once everything is in place
-            resolve(window.YT);
-        };
-
-        const existingScript = document.querySelector(`script[src="${YOUTUBE_IFRAME_API_URL}"]`);
-        if (existingScript) {
-            return;
-        }
-
-        const script = document.createElement("script");
-        script.src = YOUTUBE_IFRAME_API_URL;
-        script.async = true;
-        script.onerror = () => {
-            reject(new Error("Failed to load YouTube IFrame API."));
-        };
-
-        document.head.appendChild(script);
-    });
-
-    return window[YOUTUBE_IFRAME_PROMISE_KEY];
-};
+const USE_MOCK_YOUTUBE_SEARCH = import.meta.env.VITE_USE_MOCK_YOUTUBE_SEARCH === "true"
 
 const tempSearchResults = {
     "ok": true,
@@ -501,153 +468,39 @@ const tempSearchResults = {
     ]
 }
 
-const formatViews = (viewCount) => {
-    const numericViews = Number(viewCount);
-    if (!Number.isFinite(numericViews) || numericViews < 0) {
-        return "No views";
-    }
+const PRESET_OPTIONS = [
+    {
+        IconComponent: MusicNoteIcon,
+        iconClassName: "text-[#80E791]",
+        textStyle: "bg-linear-to-r from-[#05DF72] to-[#80E791] bg-clip-text text-transparent text-[#80E791]",
+        value: "trending_music_videos", 
+        label: "Trending Music Videos" 
+    },
+    { 
+        IconComponent: TrendingIcon,
+        iconClassName: "text-primary",
+        textStyle: "text-primary",
+        value: "trending_videos", 
+        label: "Trending Videos" 
+    },
+    { 
+        IconComponent: MusicNoteIcon,
+        iconClassName: "text-[#F210FA]",
+        textStyle: "bg-linear-to-r from-[#C576FF] to-[#F210FA] bg-clip-text text-transparent text-[#F210FA]",
+        value: "kpop_music_videos", 
+        label: "K-pop Music Videos" 
+    },
+];
 
-    // use US number style, abbreviate large numbers, and keep at most one decimal
-    const formatted = new Intl.NumberFormat("en-US", {
-        notation: "compact",
-        maximumFractionDigits: 1,
-    }).format(numericViews);
-
-    return `${formatted} views`;
-};
-
-const formatPublishedAgo = (publishedAt) => {
-    const publishedAtMs = new Date(publishedAt).getTime(); // returns ms
-    if (!Number.isFinite(publishedAtMs)) {
-        return "Unknown date";
-    }
-
-    // get seconds since video was published
-    const elapsedSeconds = Math.max(0, Math.floor((Date.now() - publishedAtMs) / 1000));
-    if (elapsedSeconds < 60) {
-        return "just now";
-    }
-
-    const units = [
-        { label: "year", seconds: 31536000 },
-        { label: "month", seconds: 2592000 },
-        { label: "week", seconds: 604800 },
-        { label: "day", seconds: 86400 },
-        { label: "hour", seconds: 3600 },
-        { label: "minute", seconds: 60 },
-    ];
-
-    for (const unit of units) {
-        const unitValue = Math.floor(elapsedSeconds / unit.seconds);
-        
-        // unitValue is >= 1 if this is the best unit to represent the time since the video was published. 
-        // It is a fraction < 1 if the unit is too large to represent elapsedSeconds
-        if (unitValue >= 1) {
-            const suffix = unitValue === 1 ? "" : "s"; // decide whether or not to include the s (ex: year vs years)
-            return `${unitValue} ${unit.label}${suffix} ago`;
-        }
-    }
-
-    return "just now";
-};
-
-const formatVideoDuration = (duration) => {
-    // breaks down a string like PT1H30M15S into its individual components
-    const match = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(String(duration ?? "").trim());
-    if (!match) {
-        return "";
-    }
-
-    const hours = Number(match[1] ?? 0);
-    const minutes = Number(match[2] ?? 0);
-    const seconds = Number(match[3] ?? 0);
-    if (!Number.isFinite(hours) || !Number.isFinite(minutes) || !Number.isFinite(seconds)) {
-        return "";
-    }
-
-    if (hours > 0) {
-        return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-    }
-
-    return `${minutes}:${String(seconds).padStart(2, "0")}`;
-};
-
-const YOUTUBE_VIDEO_ID_REGEX = /^[a-zA-Z0-9_-]{11}$/;
-const YOUTUBE_PATH_VIDEO_SEGMENTS = new Set(["embed", "shorts", "live", "v"]);
-
-/*
- * Common valid forms put the ID at:
- * query param v=...
- * first segment on youtu.be/...
- * second segment on /embed/..., /shorts/..., /live/..., /v/...
- */
-const extractYoutubeVideoId = (inputValue) => {
-    const normalizedInput = String(inputValue ?? "").trim();
-    if (!normalizedInput) {
-        return "";
-    }
-
-    // Support direct video id input as a convenience.
-    if (YOUTUBE_VIDEO_ID_REGEX.test(normalizedInput)) {
-        return normalizedInput;
-    }
-
-    const urlCandidate = /^https?:\/\//i.test(normalizedInput)
-        ? normalizedInput
-        : `https://${normalizedInput}`;
-
-    let parsedUrl;
-    try {
-        parsedUrl = new URL(urlCandidate);
-    } catch {
-        return "";
-    }
-
-    const hostname = parsedUrl.hostname.toLowerCase().replace(/^www\./, "");
-    
-    // Ex: https://youtu.be/ArmDp-zijuc, https://www.youtube.com/shorts/ArmDp-zijuc, https://www.youtube.com/embed/ArmDp-zijuc
-    const pathSegments = parsedUrl.pathname.split("/").filter(Boolean);
-
-    // youtu.be is Youtube's official short-link domain, which usually sotres the video ID in the path
-    if (hostname === "youtu.be") {
-        const shortenedUrlVideoId = String(pathSegments[0] ?? "").trim();
-        return YOUTUBE_VIDEO_ID_REGEX.test(shortenedUrlVideoId) ? shortenedUrlVideoId : "";
-    }
-
-    const isYoutubeHost = hostname === "youtube.com"
-        || hostname.endsWith(".youtube.com")
-        || hostname === "youtube-nocookie.com"
-        || hostname.endsWith(".youtube-nocookie.com");
-
-    if (!isYoutubeHost) {
-        return "";
-    }
-
-    // check if video id exists in the v query param
-    const watchQueryVideoId = String(parsedUrl.searchParams.get("v") ?? "").trim();
-    if (YOUTUBE_VIDEO_ID_REGEX.test(watchQueryVideoId)) {
-        return watchQueryVideoId;
-    }
-
-    const maybeSegmentType = pathSegments[0];
-    const segmentVideoId = String(pathSegments[1] ?? "").trim();
-    if (!YOUTUBE_PATH_VIDEO_SEGMENTS.has(maybeSegmentType)) {
-        return "";
-    }
-
-    return YOUTUBE_VIDEO_ID_REGEX.test(segmentVideoId) ? segmentVideoId : "";
-};
-
-
-
-
-
+const DEFAULT_PRESET = "trending_music_videos";
 
 const WatchTogetherInterface = ({ isOpen }) => {
     const [isSearching, setIsSearching] = useState(false);
     const [searchError, setSearchError] = useState("");
     const [searchInput, setSearchInput] = useState("");
     const [searchResults, setSearchResults] = useState([]);
+    const [isPresetDropdownOpen, setIsPresetDropdownOpen] = useState(false);
+    const [activePreset, setActivePreset] = useState(null);
 
     const [videoQueue, setVideoQueue] = useState([]);
     const [currentQueueIndex, setCurrentQueueIndex] = useState(-1); // currentQeueueIndex -1 means theres nothing in the queue or nothing is selected - representsindex of the video currently playing
@@ -656,22 +509,25 @@ const WatchTogetherInterface = ({ isOpen }) => {
 
     const [playerError, setPlayerError] = useState("");
 
+    const hasInitializedDefaultRef = useRef(false);
     const panelRef = useRef(null);
     const queueMenuRef = useRef(null);
+    const presetDropdownRef = useRef(null);
     const playerHostRef = useRef(null); // the div where the youtube iframe will be placed
     const playerRef = useRef(null);
     const playerReadyRef = useRef(false);
     const latestSearchRequestIdRef = useRef(0);
 
     const pendingVideoIdRef = useRef(""); // represents the "latest desired video" buffer for timing gaps - exists because currentVideoId can change before YT player is ready
-    const videoQueueRef = useRef([]);
+    const videoQueueRef = useRef([]); // use this instead of videoQueue so that it doesn't force callbacks/effects to reinitialize every queue update
 
     const closeWatchTogether = useGameStore((state) => state.closeWatchTogether);
 
     const hasQueuedVideos = videoQueue.length > 0;
     const currentQueuedVideo = currentQueueIndex >= 0 ? (videoQueue[currentQueueIndex] ?? null) : null;
     const currentVideoId = currentQueuedVideo?.videoId ?? "";
-    
+    const activePresetObj = PRESET_OPTIONS.find((preset) => preset.value === activePreset) ?? null;
+
     // blur any currently focused element inside the panel
     const blurFocusedPanelElement = () => {
         // if focus is on the Document itself or body/html, can fail strict HTMLElement assumptions,
@@ -695,6 +551,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
             blurFocusedPanelElement();
             setOpenQueueMenuIndex(null);
             setQueueMenuPosition(null);
+            setIsPresetDropdownOpen(false);
         }
     }, [isOpen]);
 
@@ -753,6 +610,35 @@ const WatchTogetherInterface = ({ isOpen }) => {
         };
     }, [openQueueMenuIndex]);
 
+    // close the preset dropdown when clicking outside or when viewport changes
+    useEffect(() => {
+        if (!isPresetDropdownOpen) {
+            return;
+        }
+
+        const closePresetDropdown = () => {
+            setIsPresetDropdownOpen(false);
+        };
+
+        const handlePointerDown = (event) => {
+            if (presetDropdownRef.current?.contains(event.target)) {
+                return;
+            }
+
+            closePresetDropdown();
+        };
+
+        window.addEventListener("pointerdown", handlePointerDown, true);
+        window.addEventListener("scroll", closePresetDropdown, true);
+        window.addEventListener("resize", closePresetDropdown);
+
+        return () => {
+            window.removeEventListener("pointerdown", handlePointerDown, true);
+            window.removeEventListener("scroll", closePresetDropdown, true);
+            window.removeEventListener("resize", closePresetDropdown);
+        };
+    }, [isPresetDropdownOpen]);
+
     // keeps current queue index valid whenever the queue length changes
     // ex: if queue length shrinks and index is out of bounds --> clamp to last valid index
     useEffect(() => {
@@ -772,7 +658,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
         });
     }, [videoQueue.length]);
 
-    // destroy the youtbe player if there is nothing to play (hasQueuedVideos === false)
+    // destroy the youtube player if there is nothing to play (hasQueuedVideos === false)
     useEffect(() => {
         if (hasQueuedVideos) {
             return;
@@ -991,35 +877,38 @@ const WatchTogetherInterface = ({ isOpen }) => {
         setQueueMenuPosition(null);
     }, []);
 
-    const handleClearSearch = useCallback(() => {
-        latestSearchRequestIdRef.current += 1; // invalidate in-flight searches
-        setSearchInput("");
-        setSearchResults([]);
-        setSearchError("");
-        setIsSearching(false);
-    }, []);
-
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-
-        if (isSearching) {
-            return;
-        }
-
-        const safeQuery = searchInput.trim();
-        if (!safeQuery) {
-            setSearchResults([]);
-            setSearchError("");
-            return;
-        }
-        const pastedVideoId = extractYoutubeVideoId(safeQuery);
+    const executeSearch = useCallback(async ({ query, presetValue }) => {
+        const safeQuery = String(query ?? "").trim();
+        const selectedPreset = String(presetValue ?? DEFAULT_PRESET).trim() || DEFAULT_PRESET;
         const requestId = latestSearchRequestIdRef.current + 1;
         latestSearchRequestIdRef.current = requestId;
 
         setIsSearching(true);
         setSearchError("");
 
+        // run with preset first, then with query as link, then with query as search query
         try {
+            if (!safeQuery) {
+                const response = await fetch(`${SERVER_BASE_URL}/api/youtube/preset?kind=${selectedPreset}`);
+                const payload = await response.json().catch(() => null);
+
+                if (!response.ok) {
+                    const errorMessage = String(payload?.message ?? "Failed to fetch preset videos.");
+                    throw new Error(errorMessage);
+                }
+                
+                const safeItems = Array.isArray(payload?.items) ? payload.items : [];
+
+                if (requestId !== latestSearchRequestIdRef.current) {
+                    return;
+                }
+
+                setActivePreset(selectedPreset);
+                setSearchResults(safeItems);
+                return;
+            }            
+
+            const pastedVideoId = extractYoutubeVideoId(safeQuery);
             if (pastedVideoId) {
                 const response = await fetch(`${SERVER_BASE_URL}/api/youtube/video?videoId=${encodeURIComponent(pastedVideoId)}`);
                 const payload = await response.json().catch(() => null);
@@ -1037,28 +926,35 @@ const WatchTogetherInterface = ({ isOpen }) => {
                 if (requestId !== latestSearchRequestIdRef.current) {
                     return;
                 }
+                setActivePreset(null);
                 setSearchResults([videoItem]);
                 return;
             }
 
-            // const response = await fetch(`${SERVER_BASE_URL}/api/youtube/search?q=${encodeURIComponent(safeQuery)}`);
-            // const payload = await response.json().catch(() => null);
+            let payload;
 
-            // if (!response.ok) {
-            //     const errorMessage = String(payload?.message ?? "Failed to fetch YouTube videos.");
-            //     throw new Error(errorMessage);
-            // }
+            if (USE_MOCK_YOUTUBE_SEARCH) {
+                payload = await new Promise((resolve) => {
+                    setTimeout(() => {
+                        resolve(tempSearchResults);
+                    }, 1000)
+                })
+            } else {
+                const response = await fetch(`${SERVER_BASE_URL}/api/youtube/search?q=${encodeURIComponent(safeQuery)}`);
+                payload = await response.json().catch(() => null);
 
-            const payload = await new Promise((resolve) => {
-                setTimeout(() => {
-                    resolve(tempSearchResults);
-                }, 1000)
-            })
+                if (!response.ok) {
+                    const errorMessage = String(payload?.message ?? "Failed to fetch YouTube videos.");
+                    throw new Error(errorMessage);
+                }
+            }
 
             const safeItems = Array.isArray(payload.items) ? payload.items : [];
             if (requestId !== latestSearchRequestIdRef.current) {
                 return;
             }
+
+            setActivePreset(null);
             setSearchResults(safeItems);
         } catch (error) {
             if (requestId !== latestSearchRequestIdRef.current) {
@@ -1066,6 +962,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
             }
             setSearchResults([]);
             setSearchError(error instanceof Error ? error.message : "Failed to fetch YouTube videos.");
+            setActivePreset(null);
         } finally {
             // this is to prevent an old request from turning off the loading state of a newer one
             // in other words, it only lets the latest request cotrol isSearching
@@ -1073,7 +970,55 @@ const WatchTogetherInterface = ({ isOpen }) => {
                 setIsSearching(false);
             }
         }
+    }, []);
+
+    // execute the search for the default preset on watch together open
+    useEffect(() => {
+        if (!isOpen || hasInitializedDefaultRef.current) {
+            return;
+        }
+
+        hasInitializedDefaultRef.current = true;
+        void executeSearch({
+            query: "",
+            presetValue: DEFAULT_PRESET,
+        });
+    }, [isOpen, executeSearch]);
+
+    const handleClearSearch = useCallback(() => {
+        latestSearchRequestIdRef.current += 1; // invalidate in-flight searches
+        setSearchInput("");
+        setSearchError("");
+        setIsPresetDropdownOpen(false);
+
+        void executeSearch({
+            query: "",
+            presetValue: DEFAULT_PRESET,
+        });
+    }, [executeSearch]);
+
+    const handleSubmit = (event) => {
+        event.preventDefault();
+        if (isSearching) {
+            return;
+        }
+
+        void executeSearch({
+            query: searchInput,
+        });
     };
+
+    const handlePresetChange = (presetValue) => {
+        const nextPresetValue = String(presetValue ?? DEFAULT_PRESET).trim() || DEFAULT_PRESET;
+        setSearchInput("");
+        setIsPresetDropdownOpen(false);
+
+        // void just says "call this expression, but intentionally ignore its return value"
+        void executeSearch({ 
+            query: "",
+            presetValue: nextPresetValue,
+        });
+    }
 
     const handleClose = () => {
         closeWatchTogether();
@@ -1245,13 +1190,24 @@ const WatchTogetherInterface = ({ isOpen }) => {
             )}
 
             {!isSearching && !searchError && searchResults.length === 0 && (
-                <p className="text-sm text-white/70">Search for a YouTube video to see results.</p>
+                <p className="text-sm text-white/70">No videos found</p>
             )}
 
             {!isSearching && !searchError && searchResults.length > 0 && (
-                <ul className={`grid gap-3 ${hasQueuedVideos ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
-                    {renderedSearchResults}
-                </ul>
+                <>
+                    {activePresetObj ? (
+                        <p className="mb-2 flex flex-row items-center gap-1 font-medium text-sm text-white/70">
+                            <activePresetObj.IconComponent className={`${activePresetObj.iconClassName} h-5 w-5`}/>
+                            <span className={`inline-block ${activePresetObj.textStyle}`}>
+                                {activePresetObj.label}
+                            </span>
+                        </p>
+                    ) : null}
+
+                    <ul className={`grid gap-3 ${hasQueuedVideos ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
+                        {renderedSearchResults}
+                    </ul>
+                </>
             )}
         </>
     );
@@ -1269,22 +1225,25 @@ const WatchTogetherInterface = ({ isOpen }) => {
                 }`}
             >
                 {/* headers and inputs */}
-                <div className="grid items-center gap-3 
-                    grid-cols-[auto_minmax(9.5rem,1fr)_auto]
-                    md:grid-cols-[clamp(10rem,16vw,12rem)_minmax(9.5rem,1fr)_clamp(1.5rem,16vw,12rem)]"
+                <div className="grid items-start gap-3
+                    grid-cols-[minmax(0,1fr)_auto]
+                    sm:items-center sm:grid-cols-[auto_minmax(9.5rem,1fr)_auto]
+                    lg:grid-cols-[clamp(10rem,16vw,12rem)_minmax(9.5rem,1fr)_clamp(1.5rem,16vw,12rem)]"
                 >
                     {/* title */}
-                    <div className="flex flex-row gap-1 items-center whitespace-nowrap">
+                    <div className="row-start-1 col-start-1 flex flex-row gap-1 items-center whitespace-nowrap">
                         <img className="w-9 h-9" src={ShibaInuFace} alt="Shiba Inu logo" />
                         <p className="text-sm truncate">Watch_3_Gether</p>
                     </div>
 
                     {/* inputs */}
-                    <div className="flex flex-row gap-3 w-full min-w-0 justify-center">
+                    <div className="row-start-2 col-start-1 col-span-2 sm:row-start-1 sm:col-start-2 sm:col-span-1 font-['Roboto'] flex flex-col gap-2 w-full
+                        min-w-0 justify-center items-stretch xs:flex-row xs:items-center"
+                    >
                         {/* search input */}
                         <form 
                             onSubmit={handleSubmit}
-                            className="font-['Roboto'] relative w-full max-w-lg flex flex-row items-stretch"
+                            className="relative w-full max-w-120 flex flex-row items-stretch"
                         >
                             <input 
                                 type="text" 
@@ -1311,18 +1270,71 @@ const WatchTogetherInterface = ({ isOpen }) => {
                                 type="submit"
                                 disabled={isSearching}
                                 aria-label="Search videos"
-                                className="hover:cursor-pointer w-14 bg-[rgba(94,94,94,0.6)] rounded-r-full rounded-l-none flex items-center justify-center
+                                className="hover:cursor-pointer w-14 bg-[rgba(94,94,94,0.6)] border-t border-r border-b border-white/30 rounded-r-full rounded-l-none flex items-center justify-center
                                     transition-colors duration-100 hover:bg-[rgba(94,94,94,0.8)] active:bg-[rgba(94,94,94,0.6)]"
                             >
                                 <SearchIcon className="h-4 w-4 -translate-x-1"/>
                             </button>
                         </form>
+
+                        {/* preset options */}
+                        <div ref={presetDropdownRef} className="relative w-full xs:w-37 shrink-0">
+                            {/* preset trigger */}
+                            <button 
+                                type="button"
+                                aria-haspopup="menu"
+                                aria-expanded={isPresetDropdownOpen}
+                                aria-controls="watch-together-preset-menu" // links a control element to the element it controls
+                                className="w-full flex flex-row items-center justify-between gap-1 px-2.5 py-2 rounded-full border border-white/30 bg-[rgba(41,41,41,0.7)] text-sm
+                                    cursor-pointer hover:border-white/40 hover:bg-[rgba(60,60,60,0.7)] active:border-white/50 active:bg-[rgba(64,64,64,0.7)] transition-colors"
+                                onClick={() => {
+                                    setIsPresetDropdownOpen((prev) => !prev);
+                                }}
+                            >
+                                <span className="min-w-0 flex items-center">
+                                    <p className="truncate text-left text-white">Browse Presets</p>
+                                </span>
+                                <ExpandMoreIcon 
+                                    className={`shrink-0 ${isPresetDropdownOpen ? "rotate-180" : "rotate-0"} transition-transform duration-100`}
+                                />
+                            </button>
+
+                            {/* options */}
+                            <div 
+                                id="watch-together-preset-menu"
+                                role="menu"
+                                aria-hidden={!isPresetDropdownOpen}
+                                className={`absolute z-40 top-[calc(100%+2px)] left-0 w-full xs:w-max xs:min-w-50 xs:max-w-88 max-w-[90vw] flex flex-col items-start rounded-lg shadow-lg bg-[rgba(41,41,41,1)] transition-all
+                                ${isPresetDropdownOpen ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0 pointer-events-none"}
+                                overflow-hidden`}
+                            >
+                                {PRESET_OPTIONS.map((presetObj) => {
+                                    const PresetIcon = presetObj.IconComponent;
+                                    return (    
+                                        <button 
+                                            key={presetObj.value}
+                                            type="button"
+                                            role="menuitem"
+                                            tabIndex={isPresetDropdownOpen ? 0 : -1}
+                                            className="flex flex-row w-full items-center gap-1 px-2.5 py-2 text-sm whitespace-nowrap
+                                                first:rounded-t-lg last:rounded-b-lg cursor-pointer hover:bg-[rgba(60,60,60,1)] active:bg-[rgba(64,64,64,1)] transition-colors"
+                                            onClick={() => {
+                                                handlePresetChange(presetObj.value)
+                                            }}
+                                        >
+                                            <PresetIcon className={`${presetObj.iconClassName} h-6 w-6`} />
+                                            <p className={`text-left ${presetObj.textStyle}`}>{presetObj.label}</p>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        </div>
                     </div>
 
                     {/* close */}
                     <button 
                         type="button"
-                        className="w-6 h-auto justify-self-end hover:cursor-pointer 
+                        className="row-start-1 col-start-2 sm:col-start-3 w-6 h-auto justify-self-end hover:cursor-pointer 
                             transition-transform duration-150 ease-out hover:scale-[1.02] active:scale-100 hover:opacity-95 active:opacity-90"
                         onMouseDown={(event) => event.preventDefault()} // prevent close button from taking mouse focus
                         onClick={handleClose}
@@ -1333,10 +1345,10 @@ const WatchTogetherInterface = ({ isOpen }) => {
 
                 {/* if queuedVideos, left side player + queue - right side search results. Else, all search results */}
                 {hasQueuedVideos ? (
-                    <div className="font-['Roboto'] mt-4 flex-1 min-h-0 grid grid-cols-1 gap-4 xs:grid-cols-[minmax(20rem,2fr)_minmax(0,3fr)]">
+                    <div className="font-['Roboto'] mt-2 flex-1 min-h-0 grid grid-cols-1 gap-4 xs:grid-cols-[minmax(20rem,2fr)_minmax(0,3fr)]">
                         {/* player + queue */}
                         <div className="min-h-0 flex flex-col">
-                            <div className="w-full overflow-hidden rounded-lg border border-white/20 bg-black aspect-video">
+                            <div className="w-full overflow-hidden rounded-xl border border-white/20 bg-black aspect-video">
                                 <div ref={playerHostRef} className="w-full h-full" />
                             </div>
 
@@ -1349,7 +1361,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
                                 <p className="text-xs tracking-wide text-white/60">Video {currentQueueIndex + 1}/{videoQueue.length}</p>
                             </div>
 
-                            <div className="mt-2 flex-1 min-h-0 overflow-y-auto pr-1 app-scroll">
+                            <div className="mt-2 flex-1 min-h-25 overflow-y-auto pr-1 app-scroll">
                                 <ul className="flex flex-col gap-2">
                                     {renderedQueueItems}
                                 </ul>
@@ -1357,13 +1369,13 @@ const WatchTogetherInterface = ({ isOpen }) => {
                         </div>
 
                         {/* search content */}
-                        <div className="min-h-0 overflow-y-auto pr-1 app-scroll">
+                        <div className="min-h-0 mt-1 overflow-y-auto pr-1 app-scroll">
                             {isOpen ? searchContent : null}
                         </div>
                     </div>
                 ) : (
                     // search content
-                    <div className="font-['Roboto'] mt-4 flex-1 min-h-0 overflow-y-auto pr-1 app-scroll">
+                    <div className="font-['Roboto'] mt-2 flex-1 min-h-0 overflow-y-auto pr-1 app-scroll">
                         {isOpen ? searchContent : null}
                     </div>
                 )}

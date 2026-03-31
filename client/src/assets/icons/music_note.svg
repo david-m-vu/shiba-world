@@ -1,0 +1,18 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g clip-path="url(#clip0_189_629)">
+<path d="M12 3V13.55C11.41 13.21 10.73 13 10 13C7.79 13 6 14.79 6 17C6 19.21 7.79 21 10 21C12.21 21 14 19.21 14 17V7H18V3H12Z" fill="currentColor"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_189_629" x1="12" y1="3" x2="12" y2="21" gradientUnits="userSpaceOnUse">
+<stop stop-color="#05DF72"/>
+<stop offset="1" stop-color="#80E791"/>
+</linearGradient>
+<linearGradient id="paint1_kpop" x1="12" y1="3" x2="12" y2="21" gradientUnits="userSpaceOnUse">
+<stop stop-color="#C576FF"/>
+<stop offset="1" stop-color="#F210FA"/>
+</linearGradient>
+<clipPath id="clip0_189_629">
+<rect width="24" height="24" fill="white"/>
+</clipPath>
+</defs>
+</svg>
