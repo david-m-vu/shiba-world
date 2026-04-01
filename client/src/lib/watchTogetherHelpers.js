@@ -134,3 +134,21 @@ export const extractYoutubeVideoId = (inputValue) => {
 
     return YOUTUBE_VIDEO_ID_REGEX.test(segmentVideoId) ? segmentVideoId : "";
 };
+
+export const getEffectiveWatchTimeSec = (watchTogether = {}) => {
+    const playbackStatus = String(watchTogether.playbackStatus ?? "paused").toLowerCase();
+    const playbackRate = Number(watchTogether.playbackRate);
+    const anchorTimeSec = Number(watchTogether.anchorTimeSec);
+    const anchorServerTsMs = Number(watchTogether.anchorServerTsMs);
+
+    const safePlaybackRate = Number.isFinite(playbackRate) ? playbackRate : 1;
+    const safeAnchorTimeSec = Number.isFinite(anchorTimeSec) ? Math.max(0, anchorTimeSec) : 0;
+    const safeAnchorServerTsMs = Number.isFinite(anchorServerTsMs) ? anchorServerTsMs : Date.now();
+
+    if (playbackStatus === "playing") {
+        const elapsedSec = Math.max(0, (Date.now() - safeAnchorServerTsMs) / 1000);
+        return Math.max(0, safeAnchorTimeSec + (elapsedSec * safePlaybackRate));
+    }
+
+    return safeAnchorTimeSec;
+};

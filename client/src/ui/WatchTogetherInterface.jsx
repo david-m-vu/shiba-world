@@ -16,6 +16,7 @@ import {
     formatPublishedAgo,
     formatVideoDuration,
     formatViews,
+    getEffectiveWatchTimeSec
 } from "../lib/watchTogetherHelpers.js";
 
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
@@ -494,24 +495,6 @@ const PRESET_OPTIONS = [
 
 const DEFAULT_PRESET = "trending_music_videos";
 const EMPTY_WATCH_QUEUE = Object.freeze([]); // gives a stable reference so hooks that depend on videoQueue don't think it changed when watchTogether.queue is missing
-
-const getEffectiveWatchTimeSec = (watchTogether = {}) => {
-    const playbackStatus = String(watchTogether.playbackStatus ?? "paused").toLowerCase();
-    const playbackRate = Number(watchTogether.playbackRate);
-    const anchorTimeSec = Number(watchTogether.anchorTimeSec);
-    const anchorServerTsMs = Number(watchTogether.anchorServerTsMs);
-
-    const safePlaybackRate = Number.isFinite(playbackRate) ? playbackRate : 1;
-    const safeAnchorTimeSec = Number.isFinite(anchorTimeSec) ? Math.max(0, anchorTimeSec) : 0;
-    const safeAnchorServerTsMs = Number.isFinite(anchorServerTsMs) ? anchorServerTsMs : Date.now();
-
-    if (playbackStatus === "playing") {
-        const elapsedSec = Math.max(0, (Date.now() - safeAnchorServerTsMs) / 1000);
-        return Math.max(0, safeAnchorTimeSec + (elapsedSec * safePlaybackRate));
-    }
-
-    return safeAnchorTimeSec;
-};
 
 const WatchTogetherInterface = ({ isOpen }) => {
     const [isSearching, setIsSearching] = useState(false);

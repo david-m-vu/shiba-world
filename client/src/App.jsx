@@ -52,7 +52,7 @@ const App = () => {
       <div className={`relative w-full h-full ${isInRoom && cameraLockMode ? "cursor-none" : ""}`}>
         <Canvas 
           shadows={shadowsEnabled}
-          className="w-full h-full"
+          className="z-0 w-full h-full"
           camera={{ position: [44, 16, 0] }}
           gl={{
             toneMapping: ACESFilmicToneMapping,
