@@ -493,6 +493,25 @@ const PRESET_OPTIONS = [
 ];
 
 const DEFAULT_PRESET = "trending_music_videos";
+const EMPTY_WATCH_QUEUE = Object.freeze([]); // gives a stable reference so hooks that depend on videoQueue don't think it changed when watchTogether.queue is missing
+
+const getEffectiveWatchTimeSec = (watchTogether = {}) => {
+    const playbackStatus = String(watchTogether.playbackStatus ?? "paused").toLowerCase();
+    const playbackRate = Number(watchTogether.playbackRate);
+    const anchorTimeSec = Number(watchTogether.anchorTimeSec);
+    const anchorServerTsMs = Number(watchTogether.anchorServerTsMs);
+
+    const safePlaybackRate = Number.isFinite(playbackRate) ? playbackRate : 1;
+    const safeAnchorTimeSec = Number.isFinite(anchorTimeSec) ? Math.max(0, anchorTimeSec) : 0;
+    const safeAnchorServerTsMs = Number.isFinite(anchorServerTsMs) ? anchorServerTsMs : Date.now();
+
+    if (playbackStatus === "playing") {
+        const elapsedSec = Math.max(0, (Date.now() - safeAnchorServerTsMs) / 1000);
+        return Math.max(0, safeAnchorTimeSec + (elapsedSec * safePlaybackRate));
+    }
+
+    return safeAnchorTimeSec;
+};
 
 const WatchTogetherInterface = ({ isOpen }) => {
     const [isSearching, setIsSearching] = useState(false);
@@ -502,8 +521,6 @@ const WatchTogetherInterface = ({ isOpen }) => {
     const [isPresetDropdownOpen, setIsPresetDropdownOpen] = useState(false);
     const [activePreset, setActivePreset] = useState(null);
 
-    const [videoQueue, setVideoQueue] = useState([]);
-    const [currentQueueIndex, setCurrentQueueIndex] = useState(-1); // currentQeueueIndex -1 means theres nothing in the queue or nothing is selected - representsindex of the video currently playing
     const [openQueueMenuIndex, setOpenQueueMenuIndex] = useState(null);
     const [queueMenuPosition, setQueueMenuPosition] = useState(null);
 
@@ -518,10 +535,31 @@ const WatchTogetherInterface = ({ isOpen }) => {
     const playerReadyRef = useRef(false);
     const latestSearchRequestIdRef = useRef(0);
 
-    const pendingVideoIdRef = useRef(""); // represents the "latest desired video" buffer for timing gaps - exists because currentVideoId can change before YT player is ready
+    const suppressPlayerEventsRef = useRef(false);
+    const suppressPlayerEventsTimeoutRef = useRef(null);
     const videoQueueRef = useRef([]); // use this instead of videoQueue so that it doesn't force callbacks/effects to reinitialize every queue update
+    const currentQueueIndexRef = useRef(-1);
+
+    const watchTogether = useGameStore((state) => state.watchTogether);
 
     const closeWatchTogether = useGameStore((state) => state.closeWatchTogether);
+    const watchQueueAdd = useGameStore((state) => state.watchQueueAdd);
+    const watchQueueRemove = useGameStore((state) => state.watchQueueRemove);
+    const watchSetIndex = useGameStore((state) => state.watchSetIndex);
+
+    const watchPlay = useGameStore((state) => state.watchPlay);
+    const watchPause = useGameStore((state) => state.watchPause);
+    const watchSetRate = useGameStore((state) => state.watchSetRate);
+
+    // variables stemming from global watchTogether state
+    const videoQueue = Array.isArray(watchTogether.queue) ? watchTogether.queue : EMPTY_WATCH_QUEUE;
+    const currentQueueIndex = Number.isInteger(watchTogether.currentQueueIndex) ? watchTogether.currentQueueIndex : -1;
+    const playbackStatus = String(watchTogether.playbackStatus ?? "paused").toLowerCase() === "playing" ? "playing" : "paused";
+    const playbackRate = Number.isFinite(Number(watchTogether.playbackRate)) ? Number(watchTogether.playbackRate) : 1;
+    const anchorTimeSec = Number.isFinite(Number(watchTogether.anchorTimeSec)) ? Number(watchTogether.anchorTimeSec) : 0;
+    const anchorServerTsMs = Number.isFinite(Number(watchTogether.anchorServerTsMs))
+        ? Number(watchTogether.anchorServerTsMs)
+        : Date.now(); // fallback to Date.now() makes elapsed time ~0, so behavior degrades safely to "play near ahcorTimeSec" until real server state arrives
 
     const hasQueuedVideos = videoQueue.length > 0;
     const currentQueuedVideo = currentQueueIndex >= 0 ? (videoQueue[currentQueueIndex] ?? null) : null;
@@ -541,9 +579,29 @@ const WatchTogetherInterface = ({ isOpen }) => {
         }
     };
 
+    // keep videoQueueRef in sync
     useEffect(() => {
         videoQueueRef.current = videoQueue;
     }, [videoQueue]);
+
+    // keep currentQueueIndexRef in sync
+    useEffect(() => {
+        currentQueueIndexRef.current = currentQueueIndex;
+    }, [currentQueueIndex]);
+
+    // handle cases where the open queue menu index becomes invalid as a result of deletion
+    useEffect(() => {
+        if (openQueueMenuIndex === null) {
+            return;
+        }
+
+        if (openQueueMenuIndex < videoQueue.length) {
+            return;
+        }
+
+        setOpenQueueMenuIndex(null);
+        setQueueMenuPosition(null);
+    }, [openQueueMenuIndex, videoQueue.length]);
 
     // blur any focused element when WatchTogetherInterface is closed
     useEffect(() => {
@@ -639,39 +697,108 @@ const WatchTogetherInterface = ({ isOpen }) => {
         };
     }, [isPresetDropdownOpen]);
 
-    // keeps current queue index valid whenever the queue length changes
-    // ex: if queue length shrinks and index is out of bounds --> clamp to last valid index
-    useEffect(() => {
-        if (videoQueue.length === 0) {
-            setCurrentQueueIndex(-1);
+    // short mute window for Youtube event callbacks
+    // When we programmatically apply server state (loadVideoById, cueVideoById, seekTo, pauseVideo, etc.), the player fires onStateChange/onPlaybackRateChange events. 
+    // Without suppression, those callbacks would re-emit commands (watchPlay, watchPause, watchSetRate) back to the server, causing feedback loops and noisy duplicate updates.
+    const suppressPlayerEvents = useCallback((durationMs = 500) => {
+        suppressPlayerEventsRef.current = true;
+
+        // if suppress player events timeout exists and we want to suppress is again, clear it to allow for a new timeout to be set
+        if (suppressPlayerEventsTimeoutRef.current) {
+            window.clearTimeout(suppressPlayerEventsTimeoutRef.current);
+        }
+
+        // set a timeout for when we want to stop suppressing player events
+        suppressPlayerEventsTimeoutRef.current = window.setTimeout(() => {
+            suppressPlayerEventsRef.current = false;
+            suppressPlayerEventsTimeoutRef.current = null;
+        }, durationMs);
+    }, []);
+
+    const syncPlayerToWatchState = useCallback(() => {
+        if (!playerRef.current || !playerReadyRef.current || !currentVideoId) {
             return;
         }
 
-        setCurrentQueueIndex((previousIndex) => {
-            if (previousIndex < 0) {
-                return 0;
-            }
-            if (previousIndex >= videoQueue.length) {
-                return videoQueue.length - 1;
-            }
-            return previousIndex;
+        const player = playerRef.current;
+        const loadedVideoId = String(player.getVideoData?.()?.video_id ?? "");
+        
+        // get server authoritative effectiveWatchTimeSec
+        const effectiveTimeSec = getEffectiveWatchTimeSec({
+            playbackStatus,
+            playbackRate,
+            anchorTimeSec,
+            anchorServerTsMs,
         });
-    }, [videoQueue.length]);
+        const safeEffectiveTimeSec = Number.isFinite(effectiveTimeSec) ? Math.max(0, effectiveTimeSec) : 0;
 
-    // destroy the youtube player if there is nothing to play (hasQueuedVideos === false)
-    useEffect(() => {
-        if (hasQueuedVideos) {
+        const currentPlayerRate = Number(player.getPlaybackRate?.() ?? 1);
+        const currentPlayerTime = Number(player.getCurrentTime?.() ?? 0);
+        const currentPlayerState = Number(player.getPlayerState?.());
+
+        // currentVideoId is the current video id according to the server authoritative state
+        // this happens when video is changed from the currently loaded one
+        if (loadedVideoId !== currentVideoId) {
+            // suppress any player event handlers while we're updating the player due to syncPlayerToWatchState
+            suppressPlayerEvents(900);
+
+            if (playbackStatus === "playing") {
+                player.loadVideoById({
+                    videoId: currentVideoId,
+                    startSeconds: safeEffectiveTimeSec,
+                });
+            } else {
+                // load video without starting playback - used for pause state and don't auto-play
+                player.cueVideoById({
+                    videoId: currentVideoId,
+                    startSeconds: safeEffectiveTimeSec,
+                });
+                player.pauseVideo?.(); // just in case video isn't paused when cued
+            }
+
+            if (Math.abs(currentPlayerRate - playbackRate) > 0.01) {
+                player.setPlaybackRate?.(playbackRate);
+            }
             return;
         }
 
-        if (playerRef.current) {
-            playerRef.current.destroy();
-            playerRef.current = null;
+        // handles the case where the server playbackrate is different from the current playback rate
+        // note setPlaybackRate doesn't guarantee that the playback rate will change. If it does change, the onPlaybackRateChange event will fire
+        if (Math.abs(currentPlayerRate - playbackRate) > 0.01) {
+            suppressPlayerEvents(400);
+            player.setPlaybackRate?.(playbackRate);
         }
 
-        playerReadyRef.current = false;
-        pendingVideoIdRef.current = "";
-    }, [hasQueuedVideos]);
+        // compare player's current time (currentPlayerTime) with server derived target time (safeEffectiveTimeSec)
+        // if difference in current time and server time is big enough, then we correct the player time with seekTo
+        const allowedDrift = playbackStatus === "playing" ? 1.25 : 0.35;
+        if (Math.abs(currentPlayerTime - safeEffectiveTimeSec) > allowedDrift) {
+            suppressPlayerEvents(450);
+            player.seekTo?.(safeEffectiveTimeSec, true);
+        }
+
+        if (playbackStatus === "playing") {
+            if (currentPlayerState !== window.YT.PlayerState.PLAYING) {
+                suppressPlayerEvents(450);
+                player.playVideo?.();
+            }
+            return;
+        }
+
+        // at this point, we know the status isn't playing. So if it's not already paused or cued, pause the video
+        // an example is if the player state server side is buffering somehow. Mostly to handle incorrect player states
+        if (currentPlayerState !== window.YT.PlayerState.PAUSED && currentPlayerState !== window.YT.PlayerState.CUED) {
+            suppressPlayerEvents(450);
+            player.pauseVideo?.();
+        }
+    }, [
+        anchorServerTsMs,
+        anchorTimeSec,
+        currentVideoId,
+        playbackRate,
+        playbackStatus,
+        suppressPlayerEvents,
+    ]); // since syncPlayerToWatchState uses these variables in its closure, if the function didn't update when these changed, it could run with stale values and sync the player to old state
 
     // create the player and play the first video if the user queued videos
     useEffect(() => {
@@ -700,29 +827,106 @@ const WatchTogetherInterface = ({ isOpen }) => {
                     events: {
                         onReady: () => {
                             playerReadyRef.current = true;
-
-                            // pendingVideoIdRef.current is falsy when video that the player loaded is caught up to currentVideoId
-                            const nextVideoId = pendingVideoIdRef.current || currentVideoId;
-                            if (nextVideoId) {
-                                playerRef.current?.loadVideoById(nextVideoId);
-                                pendingVideoIdRef.current = "";
-                            }
+                            syncPlayerToWatchState();
                         },
-                        onStateChange: (event) => {
-                            // only handle case where the video ended - to autoplay next video (if next video exists)
-                            if (event.data !== window.YT.PlayerState.ENDED) {
+                        onStateChange: async (event) => {
+                            // if we're currently suppressing events, dont send any emits to the server
+                            if (suppressPlayerEventsRef.current || !playerRef.current) {
                                 return;
                             }
 
-                            setCurrentQueueIndex((previousIndex) => {
-                                const nextIndex = previousIndex + 1;
-                                // this is true when no valid current video is selected (-1 state), or we're already at the last qeuued video so advancing would go out of bounds
-                                if (previousIndex < 0 || nextIndex >= videoQueueRef.current.length) {
-                                    return previousIndex;
+                            if (event.data !== window.YT.PlayerState.ENDED) {
+                                // this technically syncs seeks as well because a seek usually triggers a state transition sequence (BUFFERING, then PLAYING or PAUSED), 
+                                // and the code reacts to PLAYING/PAUSED by sending current time via watchPlay/watchPause:
+                                if (event.data === window.YT.PlayerState.PLAYING) {
+                                    const currentTime = Number(playerRef.current.getCurrentTime?.() ?? 0);
+                                    const currentRate = Number(playerRef.current.getPlaybackRate?.() ?? playbackRate);
+                                    
+                                    // send a play command
+                                    const result = await watchPlay({
+                                        timeSec: currentTime,
+                                        playbackRate: currentRate,
+                                    });
+
+                                    if (!result.ok) {
+                                        setPlayerError(result.message ?? "Failed to sync play state.");
+                                    }
+                                    return;
                                 }
-                                return nextIndex;
+
+                                if (event.data === window.YT.PlayerState.PAUSED) {
+                                    const currentTime = Number(playerRef.current.getCurrentTime?.() ?? 0);
+                                    const result = await watchPause({
+                                        timeSec: currentTime,
+                                    });
+
+                                    if (!result.ok) {
+                                        setPlayerError(result.message ?? "Failed to sync pause state.");
+                                    }
+                                }
+
+                                return;
+                            }
+
+                            // if we're here, that means the ENDED event was broadcasted
+                            const previousIndex = currentQueueIndexRef.current;
+                            const nextIndex = previousIndex + 1;
+
+                            // prevIndex < 0 means no active video
+                            // nextIndex >= queue.length means current video was the last element
+                            // since server state only has playing/paused (no ended state),
+                            // pin playback to the end time so we don't rewind everyone to 0.
+                            if (previousIndex < 0 || nextIndex >= videoQueueRef.current.length) {
+                                const currentTime = Number(playerRef.current.getCurrentTime?.() ?? 0);
+                                const duration = Number(playerRef.current.getDuration?.() ?? 0);
+
+                                const safeCurrentTime = Number.isFinite(currentTime) ? Math.max(0, currentTime) : 0;
+                                const safeDuration = Number.isFinite(duration) ? Math.max(0, duration) : 0;
+
+                                // since getDuration can be 0 briefly
+                                const pauseTimeSec = Math.max(safeCurrentTime, safeDuration);
+
+                                const result = await watchPause({
+                                    timeSec: pauseTimeSec,
+                                });
+
+                                if (!result.ok) {
+                                    setPlayerError(result.message ?? "Failed to sync playback state.");
+                                }
+
+                                return;
+                            }
+
+                            // here if theres another video to play
+                            const result = await watchSetIndex({
+                                queueIndex: nextIndex,
+                                timeSec: 0,
                             });
+
+                            if (!result.ok) {
+                                setPlayerError(result.message ?? "Failed to play next queued video.");
+                            }
                         },
+                        onPlaybackRateChange: async (event) => {
+                            if (suppressPlayerEventsRef.current || !playerRef.current) {
+                                return;
+                            }
+
+                            const nextRate = Number(event.data);
+                            if (!Number.isFinite(nextRate)) {
+                                return;
+                            }
+
+                            const currentTime = Number(playerRef.current.getCurrentTime?.() ?? 0);
+                            const result = await watchSetRate({
+                                playbackRate: nextRate,
+                                timeSec: currentTime,
+                            });
+
+                            if (!result.ok) {
+                                setPlayerError(result.message ?? "Failed to sync playback rate.");
+                            }
+                        }
                     },
                 });
             })
@@ -737,41 +941,27 @@ const WatchTogetherInterface = ({ isOpen }) => {
         return () => {
             cancelled = true;
         };
-    }, [currentVideoId, hasQueuedVideos]);
+    }, [hasQueuedVideos, playbackRate, syncPlayerToWatchState, watchPause, watchPlay, watchSetIndex, watchSetRate]);
 
-    // update video that the player loads and plays based on the currentVideoId state
+    // destroy the youtube player if there is nothing to play (hasQueuedVideos === false)
     useEffect(() => {
-        if (!currentVideoId) {
+        if (hasQueuedVideos) {
             return;
         }
 
-        // why this exists:
-        // stores the target video while player is still booting
-        // if currentVideoId changes before onReady, pending is updated to the latest id
-        pendingVideoIdRef.current = currentVideoId;
-
-        // when the first video is queued, the player hasn't loaded yet
-        // so we avoid loading the video twice since the player onVideo
-            // note race condition with the player init useEffect is effectively not possible because the promise HAS to run first, and that's async
-            // thread will then transfer focus over to this useEffect
-        if (!playerRef.current || !playerReadyRef.current) {
-            return;
+        if (playerRef.current) {
+            playerRef.current.destroy();
+            playerRef.current = null;
         }
 
-        // loadedVideoId = true loaded video that player is currently playing
-        // currentVideoId is the video id of the state
-        const loadedVideoId = String(playerRef.current.getVideoData?.()?.video_id ?? "");
-        console.log(loadedVideoId)
+        playerReadyRef.current = false;
+    }, [hasQueuedVideos]);
 
-        // these differ when React state has moved to a new target video but the YT player is still on the old one (or none yet)
-        if (loadedVideoId === currentVideoId) {
-            pendingVideoIdRef.current = "";
-            return;
-        }
-
-        playerRef.current.loadVideoById(currentVideoId);
-        pendingVideoIdRef.current = "";
-    }, [currentVideoId]);
+    // this effect syncs the client side to the server authoritative state with syncPlayerToWatchState whenever it updates
+    // syncPlayerToWatchState() is set to update when the global zustand watchTogether state updates, which happens from the socket event listener
+    useEffect(() => {
+        syncPlayerToWatchState();
+    }, [syncPlayerToWatchState]);
 
     // handle player cleanup when component unmounts
     useEffect(() => {
@@ -782,7 +972,11 @@ const WatchTogetherInterface = ({ isOpen }) => {
             }
 
             playerReadyRef.current = false;
-            pendingVideoIdRef.current = "";
+            suppressPlayerEventsRef.current = false;
+            if (suppressPlayerEventsTimeoutRef.current) {
+                window.clearTimeout(suppressPlayerEventsTimeoutRef.current);
+                suppressPlayerEventsTimeoutRef.current = null;
+            }
         };
     }, []);
 
@@ -792,9 +986,13 @@ const WatchTogetherInterface = ({ isOpen }) => {
         }
 
         setPlayerError("");
-        setVideoQueue((previousQueue) => [...previousQueue, video]);
-        setCurrentQueueIndex((previousIndex) => (previousIndex < 0 ? 0 : previousIndex));
-    }, []);
+        void (async () => {
+            const response = await watchQueueAdd(video);
+            if (!response.ok) {
+                setPlayerError(response.message ?? "Failed to add video to queue.");
+            }
+        })();
+    }, [watchQueueAdd]);
 
     const handleQueueItemClick = useCallback((queueIndex) => {
         const safeQueueIndex = Number(queueIndex);
@@ -806,8 +1004,18 @@ const WatchTogetherInterface = ({ isOpen }) => {
             return;
         }
 
-        setCurrentQueueIndex(safeQueueIndex);
-    }, []);
+        setPlayerError("");
+        void (async () => {
+            const response = await watchSetIndex({
+                queueIndex: safeQueueIndex,
+                timeSec: 0,
+            });
+
+            if (!response.ok) {
+                setPlayerError(response.message ?? "Failed to change queued video.");
+            }
+        })();
+    }, [watchSetIndex]);
 
     const handleQueueMenuToggle = useCallback((queueIndex, anchorElement) => {
         const safeQueueIndex = Number(queueIndex);
@@ -841,41 +1049,18 @@ const WatchTogetherInterface = ({ isOpen }) => {
             return;
         }
 
-        setVideoQueue((previousQueue) => {
-            if (safeQueueIndex < 0 || safeQueueIndex >= previousQueue.length) {
-                return previousQueue;
+        setPlayerError("");
+        void (async () => {
+            const response = await watchQueueRemove(safeQueueIndex);
+            if (!response.ok) {
+                setPlayerError(response.message ?? "Failed to remove video from queue.");
+                return;
             }
 
-            const nextQueue = previousQueue.filter((_video, index) => index !== safeQueueIndex);
-
-            setCurrentQueueIndex((previousIndex) => {
-                if (nextQueue.length === 0) {
-                    return -1;
-                }
-
-                if (previousIndex < 0) {
-                    return 0;
-                }
-
-                // handles the case where deleted video is the current video
-                if (previousIndex === safeQueueIndex) {
-                    return Math.min(safeQueueIndex, nextQueue.length - 1);
-                }
-
-                // if the video to delete comes before the curernt video, shift the current video index back by 1
-                if (previousIndex > safeQueueIndex) {
-                    return previousIndex - 1;
-                }
-
-                return previousIndex;
-            });
-
-            return nextQueue;
-        });
-
-        setOpenQueueMenuIndex(null);
-        setQueueMenuPosition(null);
-    }, []);
+            setOpenQueueMenuIndex(null);
+            setQueueMenuPosition(null);
+        })();
+    }, [watchQueueRemove]);
 
     const executeSearch = useCallback(async ({ query, presetValue }) => {
         const safeQuery = String(query ?? "").trim();

@@ -5,10 +5,10 @@ import { applyPlayerState, createChatMessage, createPlayer, createSystemChatMess
 const rooms = new Map(); // map roomIds to room objects - to get what players are in each room + additional metadata
 const socketToRoomId = new Map(); // map socketIds to RoomIds - to get what rooms each socket belongs to
 
+const ROOM_ID_LENGTH = 8;
+
 const MAX_MESSAGES_PER_ROOM = 50;
 const OBJECT_ID_MAX_LENGTH = 64;
-const ROOM_ID_LENGTH = 8;
-const roomIdGenerator = customAlphabet("abcdefghijkmnopqrstuvwxyz23456789", ROOM_ID_LENGTH); // note that this excludes capital letters
 
 const DEFAULT_OBJECT_POSITION = Object.freeze([0, 0, 0]);
 const DEFAULT_OBJECT_QUATERNION = Object.freeze([0, 0, 0, 1]);
@@ -20,6 +20,16 @@ const DEFAULT_WORLD_LOUNGE_CHAIR_ROW_COUNT = 2;
 const DEFAULT_WORLD_LOUNGE_CHAIR_COUNT_PER_ROW = 3;
 const DEFAULT_WORLD_PLAY_AREA_SOCCER_COUNT = 5;
 const DEFAULT_WORLD_DINING_CHAIR_COUNT = 4;
+
+// watch together constants
+const MAX_WATCH_QUEUE_ITEMS = 100;
+const WATCH_VIDEO_ID_MAX_LENGTH = 16;
+const WATCH_TEXT_FIELD_MAX_LENGTH = 256;
+const WATCH_URL_FIELD_MAX_LENGTH = 512;
+const WATCH_PLAYBACK_RATE_MIN = 0.25;
+const WATCH_PLAYBACK_RATE_MAX = 2;
+
+const roomIdGenerator = customAlphabet("abcdefghijkmnopqrstuvwxyz23456789", ROOM_ID_LENGTH); // note that this excludes capital letters
 
 const buildDefaultWorldAllowedObjectIds = () => {
     const allowedObjectIds = new Set([
@@ -95,6 +105,164 @@ const sanitizeObjectId = (value) => {
     return String(value ?? "").trim().slice(0, OBJECT_ID_MAX_LENGTH);
 };
 
+const toFiniteNumber = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const clampNumber = (value, min, max) => {
+    return Math.max(min, Math.min(max, value));
+};
+
+const sanitizeWatchText = (value, maxLength = WATCH_TEXT_FIELD_MAX_LENGTH) => {
+    return String(value ?? "").trim().slice(0, maxLength);
+};
+
+const sanitizeWatchPlaybackStatus = (value, fallback = "paused") => {
+    const safeStatus = String(value ?? "").trim().toLowerCase();
+    if (safeStatus === "playing" || safeStatus === "paused") {
+        return safeStatus;
+    }
+
+    return fallback;
+};
+
+const sanitizeWatchTimeSec = (value, fallback = 0) => {
+    const nextTimeSec = toFiniteNumber(value, fallback);
+    return Math.max(0, nextTimeSec);
+};
+
+const sanitizeWatchPlaybackRate = (value, fallback = 1) => {
+    const nextRate = toFiniteNumber(value, fallback);
+    return clampNumber(nextRate, WATCH_PLAYBACK_RATE_MIN, WATCH_PLAYBACK_RATE_MAX);
+};
+
+// -1 queue index indicates there is nothing in the queue
+const sanitizeQueueIndex = (value, fallback = -1) => {
+    const nextIndex = Number(value);
+    if (!Number.isInteger(nextIndex)) {
+        return fallback;
+    }
+
+    return nextIndex;
+};
+
+const sanitizeWatchQueueVideo = (video = {}) => {
+    const videoId = sanitizeWatchText(video.videoId, WATCH_VIDEO_ID_MAX_LENGTH);
+    if (!videoId) {
+        return null;
+    }
+
+    return {
+        videoId,
+        title: sanitizeWatchText(video.title, WATCH_TEXT_FIELD_MAX_LENGTH),
+        channelTitle: sanitizeWatchText(video.channelTitle, WATCH_TEXT_FIELD_MAX_LENGTH),
+        publishedAt: sanitizeWatchText(video.publishedAt, 64),
+        thumbnailUrl: sanitizeWatchText(video.thumbnailUrl, WATCH_URL_FIELD_MAX_LENGTH),
+        viewCount: sanitizeWatchText(video.viewCount, 64),
+        duration: sanitizeWatchText(video.duration, 64),
+    };
+};
+
+const cloneWatchQueue = (queue = []) => {
+    if (!Array.isArray(queue)) {
+        return [];
+    }
+
+    return queue
+        .map((video) => sanitizeWatchQueueVideo(video))
+        .filter(Boolean);
+};
+
+
+/*
+ * Typical client calc:
+ * If playing: effectiveTime = anchorTimeSec + ((nowMs - anchorServerTsMs) / 1000) * playbackRate
+ * If paused: effectiveTime = anchorTimeSec
+ */ 
+const createWatchTogetherState = () => {
+    const nowMs = Date.now();
+    return {
+        queue: [], // queue containing watchQueueVideos
+        currentQueueIndex: -1,
+        playbackStatus: "paused",
+        playbackRate: 1,
+        anchorTimeSec: 0, // authoritative video time in s at a known moment (ex: if someone seeks to 53.2, server sets anchorTimeSec = 53.2)
+        anchorServerTsMs: nowMs, // server's timestamp in ms for when the anchor was recorded. Clients use this with anchorTimeSec
+        version: 0, // monotonic state revision number - lets clients ignore stale/out-of-order watch:stack packets (higher versionw ins)
+        updatedBy: null,
+        updatedAt: new Date(nowMs).toISOString(),
+    };
+};
+
+const cloneWatchTogetherState = (watchTogether) => {
+    const fallbackState = createWatchTogetherState();
+    const queue = cloneWatchQueue(watchTogether?.queue ?? fallbackState.queue);
+    const currentQueueIndex = sanitizeQueueIndex(watchTogether?.currentQueueIndex, -1);
+    const safeQueueIndex = queue.length === 0
+        ? -1
+        : clampNumber(currentQueueIndex, 0, queue.length - 1);
+
+    return {
+        queue,
+        currentQueueIndex: safeQueueIndex,
+        playbackStatus: sanitizeWatchPlaybackStatus(watchTogether?.playbackStatus, fallbackState.playbackStatus),
+        playbackRate: sanitizeWatchPlaybackRate(watchTogether?.playbackRate, fallbackState.playbackRate),
+        anchorTimeSec: sanitizeWatchTimeSec(watchTogether?.anchorTimeSec, fallbackState.anchorTimeSec),
+        anchorServerTsMs: toFiniteNumber(watchTogether?.anchorServerTsMs, fallbackState.anchorServerTsMs),
+        version: Math.max(0, toFiniteNumber(watchTogether?.version, fallbackState.version)),
+        updatedBy: watchTogether?.updatedBy ? String(watchTogether.updatedBy) : null,
+        updatedAt: sanitizeWatchText(watchTogether?.updatedAt, 64) || fallbackState.updatedAt,
+    };
+};
+
+// clone before getting watch together state because it avoids shared-reference bugs by ensuring mutations happen on a fresh safe object
+// also keeps outbound state isolated from internal mutable references
+// ex: 
+const getWatchTogetherState = (room) => {
+    if (!room.watchTogether) {
+        room.watchTogether = createWatchTogetherState();
+    }
+
+    // if we want to future proof object mutation bugs 
+    // else {
+    //     room.watchTogether = cloneWatchTogetherState(room.watchTogether);
+    // }
+
+    return room.watchTogether;
+};
+
+// applies mutation function on room watchTogether state then sanitizes and updates metadata
+const applyWatchMutation = (room, socketId, mutate) => {
+    const watchTogether = getWatchTogetherState(room);
+    mutate(watchTogether);
+
+    const nowMs = Date.now();
+    watchTogether.version = Math.max(0, toFiniteNumber(watchTogether.version, 0)) + 1;
+    watchTogether.updatedBy = socketId;
+    watchTogether.anchorServerTsMs = nowMs;
+    watchTogether.updatedAt = new Date(nowMs).toISOString();
+
+    // keep queue/index coherent after every command
+    if (watchTogether.queue.length === 0) {
+        watchTogether.currentQueueIndex = -1;
+        watchTogether.playbackStatus = "paused";
+        watchTogether.anchorTimeSec = 0;
+    } else {
+        watchTogether.currentQueueIndex = clampNumber(
+            sanitizeQueueIndex(watchTogether.currentQueueIndex, 0),
+            0,
+            watchTogether.queue.length - 1
+        );
+        watchTogether.playbackStatus = sanitizeWatchPlaybackStatus(watchTogether.playbackStatus, "paused");
+        watchTogether.playbackRate = sanitizeWatchPlaybackRate(watchTogether.playbackRate, 1);
+        watchTogether.anchorTimeSec = sanitizeWatchTimeSec(watchTogether.anchorTimeSec, 0);
+    }
+
+    touchRoom(room);
+    return cloneWatchTogetherState(watchTogether);
+};
+
 const createObjectState = ({ id, position, quaternion, linvel, angvel }) => {
     return {
         id,
@@ -165,6 +333,7 @@ const serializeRoom = (room) => {
         players: Array.from(room.players.values()), // room.players is a map of player ids to player objects
         objects: Array.from(room.objects.values()), // room.objects is a map of physical object ids to physical object objects
         messages: [...room.messages], // copy with spread operator - messages is an array of message objects. Earlier elements are the oldest messages
+        watchTogether: cloneWatchTogetherState(room.watchTogether),
     };
 };
 
@@ -206,6 +375,7 @@ export const createRoom = ({ socketId, playerName, worldType = "default" }) => {
         players: new Map(), // map mapping playerIds (which are socketIds right now) to player objects
         objects: new Map(), // gets populated only when a client emits object:update
         messages: [], // chat history across allplayers
+        watchTogether: createWatchTogetherState(),
     };
 
     const createdPlayer = createPlayer({ id: socketId, name: playerName });
@@ -412,6 +582,179 @@ export const addChatMessage = (socketId, text) => {
         roomId,
         message: messageObj,
         player: { ...player },
+    };
+};
+
+const normalizeWatchCommandType = (value) => {
+    const safeType = String(value ?? "").trim().toLowerCase();
+
+    if (safeType === "play") return "playback:play";
+    if (safeType === "pause") return "playback:pause";
+    if (safeType === "seek") return "playback:seek";
+    if (safeType === "rate") return "playback:rate";
+    if (safeType === "queue:add" || safeType === "enqueue") return "queue:add";
+    if (safeType === "queue:remove" || safeType === "queue:delete") return "queue:remove";
+    if (safeType === "queue:set-index" || safeType === "queue:setindex") return "queue:set-index";
+    if (safeType === "queue:clear") return "queue:clear";
+
+    return safeType;
+};
+
+export const applyWatchTogetherCommand = (socketId, commandPayload = {}) => {
+    const roomId = getRoomIdForSocket(socketId);
+    if (!roomId) {
+        throw new Error("Socket is not assigned to a room.");
+    }
+
+    const room = rooms.get(roomId) ?? null;
+    if (!room) {
+        throw new Error("Room not found.");
+    }
+
+    if (!room.players.has(socketId)) {
+        throw new Error("Player not found.");
+    }
+
+    const commandType = normalizeWatchCommandType(commandPayload.type);
+    if (!commandType) {
+        throw new Error("Watch command type is required.");
+    }
+
+    const nextWatchState = applyWatchMutation(room, socketId, (watchTogether) => {
+        switch (commandType) {
+            case "queue:add": {
+                const rawVideo = commandPayload.video ?? commandPayload.item;
+                const video = sanitizeWatchQueueVideo(rawVideo);
+                if (!video) {
+                    throw new Error("A valid video is required.");
+                }
+
+                if (watchTogether.queue.length >= MAX_WATCH_QUEUE_ITEMS) {
+                    throw new Error(`Queue limit reached (${MAX_WATCH_QUEUE_ITEMS} videos).`);
+                }
+
+                watchTogether.queue.push(video);
+                if (watchTogether.currentQueueIndex < 0) {
+                    watchTogether.currentQueueIndex = 0;
+                    watchTogether.playbackStatus = "paused";
+                    watchTogether.anchorTimeSec = 0;
+                }
+                return;
+            }
+
+            case "queue:remove": {
+                const indexToRemove = sanitizeQueueIndex(commandPayload.queueIndex ?? commandPayload.index, -1);
+                if (indexToRemove < 0 || indexToRemove >= watchTogether.queue.length) {
+                    throw new Error("Queue index is out of bounds.");
+                }
+
+                watchTogether.queue.splice(indexToRemove, 1);
+
+                if (watchTogether.queue.length === 0) {
+                    watchTogether.currentQueueIndex = -1;
+                    watchTogether.playbackStatus = "paused";
+                    watchTogether.anchorTimeSec = 0;
+                    return;
+                }
+
+                if (watchTogether.currentQueueIndex === indexToRemove) {
+                    watchTogether.currentQueueIndex = Math.min(indexToRemove, watchTogether.queue.length - 1);
+                    watchTogether.playbackStatus = "paused";
+                    watchTogether.anchorTimeSec = 0;
+                    return;
+                }
+
+                // if the watchTogether state index is > indexToRemove, we need to shift our current queue index backwards by 1
+                if (watchTogether.currentQueueIndex > indexToRemove) {
+                    watchTogether.currentQueueIndex -= 1;
+                }
+                return;
+            }
+
+            case "queue:set-index": {
+                if (watchTogether.queue.length === 0) {
+                    throw new Error("Queue is empty.");
+                }
+
+                const index = sanitizeQueueIndex(commandPayload.queueIndex ?? commandPayload.index, -1);
+                if (index < 0 || index >= watchTogether.queue.length) {
+                    throw new Error("Queue index is out of bounds.");
+                }
+
+                watchTogether.currentQueueIndex = index;
+                // allowing timeSec in payload is for flexibility, but in reality anchorTimeSec should always be set to 0 on queue index change
+                watchTogether.anchorTimeSec = sanitizeWatchTimeSec(commandPayload.timeSec, 0);
+                watchTogether.playbackStatus = "playing"; // always set playbackStatus to playing every time we select a new video in the queue
+                return;
+            }
+
+            // we currently don't have support in the frontend for this
+            case "queue:clear": {
+                watchTogether.queue = [];
+                watchTogether.currentQueueIndex = -1;
+                watchTogether.playbackStatus = "paused";
+                watchTogether.anchorTimeSec = 0;
+                return;
+            }
+
+            case "playback:play": {
+                if (watchTogether.queue.length === 0) {
+                    throw new Error("Queue is empty.");
+                }
+
+                watchTogether.playbackStatus = "playing";
+
+                // anchorTimeSec and playbackRate can be set as well for client simplicity, although it's probably not practical / required
+                watchTogether.anchorTimeSec = sanitizeWatchTimeSec(commandPayload.timeSec, watchTogether.anchorTimeSec);
+                if (commandPayload.playbackRate !== undefined) {
+                    watchTogether.playbackRate = sanitizeWatchPlaybackRate(
+                        commandPayload.playbackRate,
+                        watchTogether.playbackRate
+                    );
+                }
+                return;
+            }
+
+            // its important pass in timeSec here because otherwise, server keeps previous anchorTimeSec, which is often older (like when play started)
+            // this implies everyone will pause at stale / different times
+            case "playback:pause": {
+                watchTogether.playbackStatus = "paused";
+                watchTogether.anchorTimeSec = sanitizeWatchTimeSec(commandPayload.timeSec, watchTogether.anchorTimeSec);
+                return;
+            }
+
+            // main function here is to change anchorTimeSec
+            case "playback:seek": {
+                watchTogether.anchorTimeSec = sanitizeWatchTimeSec(commandPayload.timeSec, watchTogether.anchorTimeSec);
+                if (commandPayload.playbackStatus !== undefined) {
+                    watchTogether.playbackStatus = sanitizeWatchPlaybackStatus(
+                        commandPayload.playbackStatus,
+                        watchTogether.playbackStatus
+                    );
+                }
+                return;
+            }
+
+            case "playback:rate": {
+                watchTogether.playbackRate = sanitizeWatchPlaybackRate(
+                    commandPayload.playbackRate,
+                    watchTogether.playbackRate
+                );
+
+                if (commandPayload.timeSec !== undefined) {
+                    watchTogether.anchorTimeSec = sanitizeWatchTimeSec(commandPayload.timeSec, watchTogether.anchorTimeSec);
+                }
+                return;
+            }
+
+            default:
+                throw new Error(`Unsupported watch command type "${commandType}".`);
+        }
+    });
+
+    return {
+        roomId,
+        watchTogether: nextWatchState,
     };
 };
 

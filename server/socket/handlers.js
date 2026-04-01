@@ -5,6 +5,7 @@
 
 import {
     addChatMessage,
+    applyWatchTogetherCommand,
     createRoom,
     getRoomIdBySocket,
     getRoomSnapshot,
@@ -204,6 +205,30 @@ export const registerSocketHandlers = (io, socket) => {
             // but I think we should keep it because its explicit success/failure handling
             acknowledge(callback, { ok: true, message: result.message });
 
+        } catch (error) {
+            emitRoomError(socket, callback, error);
+        }
+    });
+
+    // valid commands: 
+    // queue:add, queue:remove, queue:set-index, queue:clear
+    // playback:play, playback:pause, playback:seek, playback:rate
+    socket.on("watch:command", (payload = {}, callback) => {
+        try {
+            console.log(`watch:command event received from ${socket.id}. Command: ${payload.type}`)
+            console.log("payload:", payload)
+            const result = applyWatchTogetherCommand(socket.id, payload);
+
+            // emit to the whole room so all clients, including sender, reconcile to server-authoritative watch state
+            io.to(result.roomId).emit("watch:state", {
+                watchTogether: result.watchTogether,
+            });
+
+            acknowledge(callback, {
+                ok: true,
+                watchTogether: result.watchTogether,
+            });
+            
         } catch (error) {
             emitRoomError(socket, callback, error);
         }

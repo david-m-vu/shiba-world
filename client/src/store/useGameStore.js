@@ -11,6 +11,8 @@ import { toSafeVector3, toSafeVector4 } from "../lib/util.js";
 const DEFAULT_TOAST_DURATION_MS = 5000;
 const MAX_ACTIVE_TOASTS = 5;
 const MAX_MESSAGES_PER_ROOM = 50;
+const WATCH_PLAYBACK_RATE_MIN = 0.25;
+const WATCH_PLAYBACK_RATE_MAX = 2;
 
 let nextToastId = 0;
 
@@ -56,6 +58,86 @@ const normalizeObjectState = (objectState = {}) => {
     };
 }
 
+const createDefaultWatchTogetherState = () => {
+    return {
+        queue: [],
+        currentQueueIndex: -1,
+        playbackStatus: "paused",
+        playbackRate: 1,
+        anchorTimeSec: 0, // authoritative video time in s at a known moment (ex: if someone seeks to 53.2, server sets anchorTimeSec = 53.2)
+        anchorServerTsMs: Date.now(), // server's timestamp in ms for when the anchor was recorded. Clients use this with anchorTimeSec
+        version: 0, // monotonic state revision number - lets clients ignore stale/out-of-order watch:stack packets (higher versionw ins)
+        updatedBy: null,
+        updatedAt: null,
+    };
+};
+
+const normalizeWatchQueueVideo = (video = {}) => {
+    const videoId = String(video.videoId ?? "").trim();
+    if (!videoId) {
+        return null;
+    }
+
+    return {
+        videoId,
+        title: String(video.title ?? "").trim(),
+        channelTitle: String(video.channelTitle ?? "").trim(),
+        publishedAt: String(video.publishedAt ?? "").trim(),
+        thumbnailUrl: String(video.thumbnailUrl ?? "").trim(),
+        viewCount: String(video.viewCount ?? "").trim(),
+        duration: String(video.duration ?? "").trim(),
+    };
+};
+
+const normalizeWatchTogetherState = (watchTogether = {}) => {
+    const fallback = createDefaultWatchTogetherState();
+    const queue = Array.isArray(watchTogether.queue)
+        ? watchTogether.queue.map((video) => normalizeWatchQueueVideo(video)).filter(Boolean)
+        : [];
+
+    const rawQueueIndex = Number(watchTogether.currentQueueIndex);
+    const safeQueueIndex = queue.length === 0
+        ? -1
+        : Number.isInteger(rawQueueIndex)
+            ? Math.max(0, Math.min(queue.length - 1, rawQueueIndex))
+            : 0;
+
+    const rawPlaybackStatus = String(watchTogether.playbackStatus ?? "").trim().toLowerCase();
+    const playbackStatus = rawPlaybackStatus === "playing" ? "playing" : "paused";
+
+    const rawPlaybackRate = Number(watchTogether.playbackRate);
+    const playbackRate = Number.isFinite(rawPlaybackRate)
+        ? Math.max(WATCH_PLAYBACK_RATE_MIN, Math.min(WATCH_PLAYBACK_RATE_MAX, rawPlaybackRate))
+        : fallback.playbackRate;
+
+    const rawAnchorTimeSec = Number(watchTogether.anchorTimeSec);
+    const anchorTimeSec = Number.isFinite(rawAnchorTimeSec)
+        ? Math.max(0, rawAnchorTimeSec)
+        : fallback.anchorTimeSec;
+
+    const rawAnchorServerTsMs = Number(watchTogether.anchorServerTsMs);
+    const anchorServerTsMs = Number.isFinite(rawAnchorServerTsMs)
+        ? rawAnchorServerTsMs
+        : fallback.anchorServerTsMs;
+
+    const rawVersion = Number(watchTogether.version);
+    const version = Number.isFinite(rawVersion)
+        ? Math.max(0, Math.floor(rawVersion))
+        : fallback.version;
+
+    return {
+        queue,
+        currentQueueIndex: safeQueueIndex,
+        playbackStatus,
+        playbackRate,
+        anchorTimeSec,
+        anchorServerTsMs,
+        version,
+        updatedBy: watchTogether.updatedBy ? String(watchTogether.updatedBy) : null,
+        updatedAt: watchTogether.updatedAt ? String(watchTogether.updatedAt) : null,
+    };
+};
+
 // This function normalizes each player in the players array and spreads them out in an object. 
 // Returns this object
 const playersToMap = (players = []) => {
@@ -100,7 +182,8 @@ const normalizeRoomState = (room = {}) => {
         objectsById,
         messages: Array.isArray(room.messages)
             ? room.messages.map((message) => normalizeMessage(message)).filter((message) => message.id)
-            : []
+            : [],
+        watchTogether: normalizeWatchTogetherState(room.watchTogether),
     }
 }
 
@@ -138,6 +221,7 @@ const applyRoomSnapshot = (set, roomSnapshot = {}, selfPlayerId = null) => {
         playersById: normalizedRoomState.playersById,
         objectsById: normalizedRoomState.objectsById,
         messages: normalizedRoomState.messages,
+        watchTogether: normalizedRoomState.watchTogether,
     })
 }
 
@@ -150,6 +234,7 @@ const clearRoomState = (set) => {
         playersById: {},
         objectsById: {},
         messages: [],
+        watchTogether: createDefaultWatchTogetherState(),
         cameraLockMode: false,
         watchTogetherOpen: false,
     })
@@ -314,6 +399,24 @@ const bindSocketListeners = (set, get, socket) => {
         })
     })
 
+    socket.on("watch:state", (payload = {}) => {
+        const incomingWatchTogether = normalizeWatchTogetherState(payload.watchTogether);
+
+        set((state) => {
+            const previousRawVersion = Number(state.watchTogether?.version ?? 0);
+            const previousVersion = Number.isFinite(previousRawVersion) ? previousRawVersion : 0;
+            
+            // if the incoming version is < current version in state, then ignore this state emit and apply no field changes to the store
+            if (incomingWatchTogether.version < previousVersion) {
+                return state;
+            }
+
+            return {
+                watchTogether: incomingWatchTogether,
+            };
+        });
+    });
+
     // keep a single listener in-memory; listeners are cleaned when socket is replaced/disconnected
     // this socketListenersReady flag ensures bindSocketListeners(...) runs once per socket instance
     get().setSocketListenersReady(true);
@@ -335,6 +438,7 @@ export const useGameStore = create(
             
             // watch together state
             watchTogetherOpen: false,
+            watchTogether: createDefaultWatchTogetherState(),
 
             localPlayerName: "",
             currentRoomId: null,
@@ -431,6 +535,184 @@ export const useGameStore = create(
             },
             closeWatchTogether: () => {
                 set({ watchTogetherOpen: false });
+            },
+
+            // commandPayload expects type, (video, queueIndex, timeSec, playbackStatus playbackRate...)
+            sendWatchCommand: async (commandPayload = {}) => {
+                const socket = get().socket;
+                if (!socket?.connected) {
+                    return { ok: false, message: "Socket is not connected." };
+                }
+
+                const nextPayload = { ...commandPayload };
+
+                // sanitize commandPayload to prepare for emit
+                const safeType = String(nextPayload.type ?? "").trim();
+                if (!safeType) {
+                    return { 
+                        ok: false, 
+                        message: "Watch command type is required." 
+                    };
+                }
+                nextPayload.type = safeType;
+
+                if (nextPayload.queueIndex !== undefined) {
+                    const parsedQueueIndex = Number(nextPayload.queueIndex);
+                    nextPayload.queueIndex = Number.isInteger(parsedQueueIndex) ? parsedQueueIndex : -1;
+                }
+
+                if (nextPayload.timeSec !== undefined) {
+                    const parsedTimeSec = Number(nextPayload.timeSec);
+                    nextPayload.timeSec = Number.isFinite(parsedTimeSec) ? Math.max(0, parsedTimeSec) : 0;
+                }
+
+                if (nextPayload.playbackRate !== undefined) {
+                    const parsedRate = Number(nextPayload.playbackRate);
+                    if (Number.isFinite(parsedRate)) {
+                        nextPayload.playbackRate = Math.max(
+                            WATCH_PLAYBACK_RATE_MIN,
+                            Math.min(WATCH_PLAYBACK_RATE_MAX, parsedRate)
+                        );
+                    } else {
+                        delete nextPayload.playbackRate;
+                    }
+                }
+
+                try {
+                    const response = await emitWithAck(socket, "watch:command", nextPayload);
+                    if (!response.ok) {
+                        const message = response.message ?? "Failed to update watch together state.";
+                        return { ok: false, message };
+                    }
+
+                    const incomingWatchTogether = normalizeWatchTogetherState(response.watchTogether);
+                    set((state) => {
+                        const previousRawVersion = Number(state.watchTogether?.version ?? 0);
+                        const previousVersion = Number.isFinite(previousRawVersion) ? previousRawVersion : 0;
+
+                        // if the incoming version is < current version in state, then ignore this state emit and apply no field changes to the store
+                        if (incomingWatchTogether.version < previousVersion) {
+                            return state;
+                        }
+
+                        return {
+                            watchTogether: incomingWatchTogether,
+                        };
+                    });
+
+                    return { ok: true, watchTogether: incomingWatchTogether };
+
+                } catch (error) {
+                    const message = error instanceof Error
+                        ? error.message
+                        : "Failed to update watch together state.";
+                        
+                    return { ok: false, message };
+                }
+            },
+
+            watchQueueAdd: async (video = {}) => {
+                const normalizedVideo = normalizeWatchQueueVideo(video);
+                if (!normalizedVideo) {
+                    return { ok: false, message: "A valid video is required." };
+                }
+
+                return get().sendWatchCommand({
+                    type: "queue:add",
+                    video: normalizedVideo,
+                });
+            },
+
+            watchQueueRemove: async (queueIndex) => {
+                const safeQueueIndex = Number(queueIndex);
+                if (!Number.isInteger(safeQueueIndex) || safeQueueIndex < 0) {
+                    return { ok: false, message: "Queue index is invalid." };
+                }
+
+                return get().sendWatchCommand({
+                    type: "queue:remove",
+                    queueIndex: safeQueueIndex,
+                });
+            },
+
+            watchSetIndex: async ({ queueIndex, timeSec = 0 } = {}) => {
+                const safeQueueIndex = Number(queueIndex);
+                if (!Number.isInteger(safeQueueIndex) || safeQueueIndex < 0) {
+                    return { ok: false, message: "Queue index is invalid." };
+                }
+
+                return get().sendWatchCommand({
+                    type: "queue:set-index",
+                    queueIndex: safeQueueIndex,
+                    timeSec,
+                });
+            },
+
+            watchQueueClear: async () => {
+                return get().sendWatchCommand({
+                    type: "queue:clear",
+                });
+            },
+
+            watchPlay: async ({ timeSec, playbackRate } = {}) => {
+                const payload = {
+                    type: "playback:play",
+                };
+
+                if (timeSec !== undefined) {
+                    payload.timeSec = timeSec;
+                }
+
+                if (playbackRate !== undefined) {
+                    payload.playbackRate = playbackRate;
+                }
+
+                return get().sendWatchCommand(payload);
+            },
+
+            watchPause: async ({ timeSec } = {}) => {
+                const payload = {
+                    type: "playback:pause",
+                };
+
+                if (timeSec !== undefined) {
+                    payload.timeSec = timeSec;
+                }
+
+                return get().sendWatchCommand(payload);
+            },
+
+            watchSeek: async ({ timeSec, playbackStatus } = {}) => {
+                const payload = {
+                    type: "playback:seek",
+                };
+
+                if (timeSec !== undefined) {
+                    payload.timeSec = timeSec;
+                }
+
+                if (playbackStatus !== undefined) {
+                    payload.playbackStatus = playbackStatus;
+                }
+
+                return get().sendWatchCommand(payload);
+            },
+
+            watchSetRate: async ({ playbackRate, timeSec } = {}) => {
+                if (playbackRate === undefined) {
+                    return { ok: false, message: "Playback rate is required." };
+                }
+
+                const payload = {
+                    type: "playback:rate",
+                    playbackRate,
+                };
+
+                if (timeSec !== undefined) {
+                    payload.timeSec = timeSec;
+                }
+
+                return get().sendWatchCommand(payload);
             },
 
             setSocketListenersReady: (socketListenersReady) => {
