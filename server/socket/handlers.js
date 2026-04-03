@@ -224,6 +224,7 @@ export const registerSocketHandlers = (io, socket) => {
                 watchTogether: result.watchTogether,
             });
 
+            // this ack shouldn't be used. Use handler for watch:state instead client side
             acknowledge(callback, {
                 ok: true,
                 watchTogether: result.watchTogether,

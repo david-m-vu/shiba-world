@@ -1,6 +1,7 @@
 import { customAlphabet } from "nanoid";
 
 import { applyPlayerState, createChatMessage, createPlayer, createSystemChatMessage } from "./players.js";
+import { normalizeVector3, normalizeQuaternion, toFiniteNumber, clampNumber } from "../util/index.js";
 
 const rooms = new Map(); // map roomIds to room objects - to get what players are in each room + additional metadata
 const socketToRoomId = new Map(); // map socketIds to RoomIds - to get what rooms each socket belongs to
@@ -22,6 +23,7 @@ const DEFAULT_WORLD_PLAY_AREA_SOCCER_COUNT = 5;
 const DEFAULT_WORLD_DINING_CHAIR_COUNT = 4;
 
 // watch together constants
+const WATCH_AUTOPLAY_LEAD_MS = 1000
 const MAX_WATCH_QUEUE_ITEMS = 100;
 const WATCH_VIDEO_ID_MAX_LENGTH = 16;
 const WATCH_TEXT_FIELD_MAX_LENGTH = 256;
@@ -30,6 +32,21 @@ const WATCH_PLAYBACK_RATE_MIN = 0.25;
 const WATCH_PLAYBACK_RATE_MAX = 2;
 
 const roomIdGenerator = customAlphabet("abcdefghijkmnopqrstuvwxyz23456789", ROOM_ID_LENGTH); // note that this excludes capital letters
+
+const createRoomId = () => {
+    return roomIdGenerator();
+};
+
+const getRoomIdForSocket = (socketId) => {
+    return socketToRoomId.get(socketId) ?? null;
+};
+
+// mark the room as recently changed, called after player join, leave, player state updates, chat message added...
+// useful if we plan to expire empty / inactive rooms
+const touchRoom = (room) => {
+    room.updatedAt = new Date().toISOString();
+    return room;
+};
 
 const buildDefaultWorldAllowedObjectIds = () => {
     const allowedObjectIds = new Set([
@@ -70,48 +87,41 @@ const getAllowedObjectIdsForWorldType = (worldType) => {
     return ALLOWED_OBJECT_IDS_BY_WORLD_TYPE[safeWorldType] ?? null;
 };
 
-const normalizeVector3 = (value, fallback = DEFAULT_OBJECT_POSITION) => {
-    if (!Array.isArray(value) || value.length !== 3) {
-        return [...fallback];
-    }
-
-    return value.map((entry, index) => {
-        const parsed = Number(entry);
-        return Number.isFinite(parsed) ? parsed : fallback[index];
-    });
-};
-
-const normalizeQuaternion = (value, fallback = DEFAULT_OBJECT_QUATERNION) => {
-    if (!Array.isArray(value) || value.length !== 4) {
-        return [...fallback];
-    }
-
-    const normalized = value.map((entry, index) => {
-        const parsed = Number(entry);
-        return Number.isFinite(parsed) ? parsed : fallback[index];
-    });
-    const length = Math.hypot(normalized[0], normalized[1], normalized[2], normalized[3]);
-
-    // a zero quaternion is invalid for rotation, and this is to avoid dividing by zero
-    if (length < 0.000001) {
-        return [...fallback];
-    }
-
-    return normalized.map((entry) => entry / length);
-};
-
 const sanitizeObjectId = (value) => {
     // this is to prevent clients from sending huge objectId strings that coudl waste memory in room.objects keys
     return String(value ?? "").trim().slice(0, OBJECT_ID_MAX_LENGTH);
 };
 
-const toFiniteNumber = (value, fallback) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : fallback;
+const createObjectState = ({ id, position, quaternion, linvel, angvel }) => {
+    return {
+        id,
+        position: normalizeVector3(position, DEFAULT_OBJECT_POSITION),
+        quaternion: normalizeQuaternion(quaternion, DEFAULT_OBJECT_QUATERNION),
+        linvel: normalizeVector3(linvel, DEFAULT_OBJECT_VELOCITY), // default to 0 linear velocity in units/s
+        angvel: normalizeVector3(angvel, DEFAULT_OBJECT_VELOCITY), // default to 0 angular velocity around each axis in radians/second
+        updatedAt: new Date().toISOString(),
+    };
 };
 
-const clampNumber = (value, min, max) => {
-    return Math.max(min, Math.min(max, value));
+const applyObjectState = (objectState, nextObjectState = {}) => {
+    if (nextObjectState.position !== undefined) {
+        objectState.position = normalizeVector3(nextObjectState.position, objectState.position ?? DEFAULT_OBJECT_POSITION);
+    }
+
+    if (nextObjectState.quaternion !== undefined) {
+        objectState.quaternion = normalizeQuaternion(nextObjectState.quaternion, objectState.quaternion ?? DEFAULT_OBJECT_QUATERNION);
+    }
+
+    if (nextObjectState.linvel !== undefined) {
+        objectState.linvel = normalizeVector3(nextObjectState.linvel, objectState.linvel ?? DEFAULT_OBJECT_VELOCITY);
+    }
+
+    if (nextObjectState.angvel !== undefined) {
+        objectState.angvel = normalizeVector3(nextObjectState.angvel, objectState.angvel ?? DEFAULT_OBJECT_VELOCITY);
+    }
+
+    objectState.updatedAt = new Date().toISOString();
+    return objectState;
 };
 
 const sanitizeWatchText = (value, maxLength = WATCH_TEXT_FIELD_MAX_LENGTH) => {
@@ -218,7 +228,6 @@ const cloneWatchTogetherState = (watchTogether) => {
 
 // clone before getting watch together state because it avoids shared-reference bugs by ensuring mutations happen on a fresh safe object
 // also keeps outbound state isolated from internal mutable references
-// ex: 
 const getWatchTogetherState = (room) => {
     if (!room.watchTogether) {
         room.watchTogether = createWatchTogetherState();
@@ -233,12 +242,13 @@ const getWatchTogetherState = (room) => {
 };
 
 // applies mutation function on room watchTogether state then sanitizes and updates metadata
+// also adds a version attribute which is used client side to ensure the most up to date state
 const applyWatchMutation = (room, socketId, mutate, { refreshAnchorServerTs = true } = {}) => {
     const watchTogether = getWatchTogetherState(room);
     mutate(watchTogether);
 
     const nowMs = Date.now();
-    watchTogether.version = Math.max(0, toFiniteNumber(watchTogether.version, 0)) + 1;
+    watchTogether.version = Math.max(0, toFiniteNumber(watchTogether.version, 0)) + 1; // default to 0 if initially null / undefined
     watchTogether.updatedBy = socketId;
     if (refreshAnchorServerTs) {
         watchTogether.anchorServerTsMs = nowMs;
@@ -263,53 +273,6 @@ const applyWatchMutation = (room, socketId, mutate, { refreshAnchorServerTs = tr
 
     touchRoom(room);
     return cloneWatchTogetherState(watchTogether);
-};
-
-const createObjectState = ({ id, position, quaternion, linvel, angvel }) => {
-    return {
-        id,
-        position: normalizeVector3(position, DEFAULT_OBJECT_POSITION),
-        quaternion: normalizeQuaternion(quaternion, DEFAULT_OBJECT_QUATERNION),
-        linvel: normalizeVector3(linvel, DEFAULT_OBJECT_VELOCITY), // default to 0 linear velocity in units/s
-        angvel: normalizeVector3(angvel, DEFAULT_OBJECT_VELOCITY), // default to 0 angular velocity around each axis in radians/second
-        updatedAt: new Date().toISOString(),
-    };
-};
-
-const applyObjectState = (objectState, nextObjectState = {}) => {
-    if (nextObjectState.position !== undefined) {
-        objectState.position = normalizeVector3(nextObjectState.position, objectState.position ?? DEFAULT_OBJECT_POSITION);
-    }
-
-    if (nextObjectState.quaternion !== undefined) {
-        objectState.quaternion = normalizeQuaternion(nextObjectState.quaternion, objectState.quaternion ?? DEFAULT_OBJECT_QUATERNION);
-    }
-
-    if (nextObjectState.linvel !== undefined) {
-        objectState.linvel = normalizeVector3(nextObjectState.linvel, objectState.linvel ?? DEFAULT_OBJECT_VELOCITY);
-    }
-
-    if (nextObjectState.angvel !== undefined) {
-        objectState.angvel = normalizeVector3(nextObjectState.angvel, objectState.angvel ?? DEFAULT_OBJECT_VELOCITY);
-    }
-
-    objectState.updatedAt = new Date().toISOString();
-    return objectState;
-};
-
-const createRoomId = () => {
-    return roomIdGenerator();
-};
-
-const getRoomIdForSocket = (socketId) => {
-    return socketToRoomId.get(socketId) ?? null;
-};
-
-// mark the room as recently changed, called after player join, leave, player state updates, chat message added...
-// useful if we plan to expire empty / inactive rooms
-const touchRoom = (room) => {
-    room.updatedAt = new Date().toISOString();
-    return room;
 };
 
 const appendRoomMessage = (room, messageObj) => {
@@ -642,8 +605,9 @@ export const applyWatchTogetherCommand = (socketId, commandPayload = {}) => {
                 watchTogether.queue.push(video);
                 if (watchTogether.currentQueueIndex < 0) {
                     watchTogether.currentQueueIndex = 0;
-                    watchTogether.playbackStatus = "paused";
+                    watchTogether.playbackStatus = "playing";
                     watchTogether.anchorTimeSec = 0;
+                    watchTogether.anchorServerTsMs = Date.now() + WATCH_AUTOPLAY_LEAD_MS; // 1000 is the short server lead-in for the first queued item, since it needs time to load client side
                 }
                 return;
             }

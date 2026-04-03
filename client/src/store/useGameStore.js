@@ -406,8 +406,8 @@ const bindSocketListeners = (set, get, socket) => {
             const previousRawVersion = Number(state.watchTogether?.version ?? 0);
             const previousVersion = Number.isFinite(previousRawVersion) ? previousRawVersion : 0;
             
-            // if the incoming version is < current version in state, then ignore this state emit and apply no field changes to the store
-            if (incomingWatchTogether.version < previousVersion) {
+            // if incoming version is <= current version in state, ignore it to prevent stale/duplicate applies
+            if (incomingWatchTogether.version <= previousVersion) {
                 return state;
             }
 
@@ -578,6 +578,8 @@ export const useGameStore = create(
                     }
                 }
 
+                // emit command and rely on watch:state socket event for authoritative state reconciliation -- 
+                // don't set state based on response, because redudant and makes local out of sync
                 try {
                     const response = await emitWithAck(socket, "watch:command", nextPayload);
                     if (!response.ok) {
@@ -585,22 +587,7 @@ export const useGameStore = create(
                         return { ok: false, message };
                     }
 
-                    const incomingWatchTogether = normalizeWatchTogetherState(response.watchTogether);
-                    set((state) => {
-                        const previousRawVersion = Number(state.watchTogether?.version ?? 0);
-                        const previousVersion = Number.isFinite(previousRawVersion) ? previousRawVersion : 0;
-
-                        // if the incoming version is < current version in state, then ignore this state emit and apply no field changes to the store
-                        if (incomingWatchTogether.version < previousVersion) {
-                            return state;
-                        }
-
-                        return {
-                            watchTogether: incomingWatchTogether,
-                        };
-                    });
-
-                    return { ok: true, watchTogether: incomingWatchTogether };
+                    return { ok: true };
 
                 } catch (error) {
                     const message = error instanceof Error

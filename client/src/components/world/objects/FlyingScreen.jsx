@@ -163,7 +163,6 @@ const FlyingScreen = ({
                     },
                     events: {
                         onReady: (event) => {
-                            console.log("FlyingScreen.jsx: youtube iframe api ready")
                             screenPlayerReadyRef.current = true;
                             event.target?.mute?.();
                             event.target?.setVolume?.(0);
@@ -197,8 +196,52 @@ const FlyingScreen = ({
 
     // sync player state every time zustand watchTogetherState changes
     useEffect(() => {
-        console.log("syncing screen player to watch state in FlyingScreen.jsx")
         syncScreenPlayerToWatchState();
+    }, [syncScreenPlayerToWatchState]);
+
+    // browser backgrounding can throttle iframe playback/timers, so force a resync when tab returns
+    useEffect(() => {
+        let delayedResyncTimeoutId = null;
+
+        const runResumeResync = () => {
+            if (document.visibilityState === "hidden") {
+                return;
+            }
+
+            syncScreenPlayerToWatchState();
+
+            if (delayedResyncTimeoutId) {
+                window.clearTimeout(delayedResyncTimeoutId);
+            }
+
+            // run resync again after 250ms to handle iframe wake-up delay
+            delayedResyncTimeoutId = window.setTimeout(() => {
+                syncScreenPlayerToWatchState();
+                delayedResyncTimeoutId = null;
+            }, 250);
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState !== "visible") {
+                return;
+            }
+
+            runResumeResync();
+        };
+
+        window.addEventListener("focus", runResumeResync);
+        window.addEventListener("pageshow", runResumeResync);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        return () => {
+            window.removeEventListener("focus", runResumeResync);
+            window.removeEventListener("pageshow", runResumeResync);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+
+            if (delayedResyncTimeoutId) {
+                window.clearTimeout(delayedResyncTimeoutId);
+            }
+        };
     }, [syncScreenPlayerToWatchState]);
 
     // handle player cleanup when component unmounts
