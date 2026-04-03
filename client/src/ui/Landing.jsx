@@ -149,7 +149,7 @@ const Landing = () => {
                                 value={roomCodeInput}
                                 required
                                 aria-invalid={safeRoomCode === ""}
-                                className="min-w-90 bg-white rounded-full py-1 px-4 text-black"
+                                className="min-w-80 xs2:min-w-85 xs:min-w-90 bg-white rounded-full py-1 px-4 text-black"
                                 onChange={(e) => {
                                     setRoomCodeInput(e.target.value);
                                     setErrorMessage("");

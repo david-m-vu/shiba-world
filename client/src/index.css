@@ -5,6 +5,7 @@
 @theme {
   --color-primary: #F6A651;
   --breakpoint-xs: 30rem;
+  --breakpoint-xs2: 25rem;
 }
 
 :root { /* same as document root element, html */

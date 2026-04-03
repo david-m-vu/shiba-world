@@ -186,7 +186,7 @@ const GameOverlay = () => {
                         }}
                         className={TOGGLE_BUTTON_CLASS}
                     >
-                        <HelpIcon className={`w-10 h-auto ${isHelpEnabled ? "text-primary" : "text-white"}`} />
+                        <HelpIcon className={`w-8 sm:w-10 h-auto ${isHelpEnabled ? "text-primary" : "text-white"}`} />
                     </button>
                     
                     <button
@@ -203,10 +203,10 @@ const GameOverlay = () => {
                             <img
                                 src={SunsetIcon}
                                 alt="Sunset mode enabled"
-                                className="w-10 h-auto"
+                                className="w-8 sm:w-10 h-auto"
                             />
                         ) : (
-                            <SunnyIcon className="w-10 h-auto text-white" />
+                            <SunnyIcon className="w-8 sm:w-10 h-auto text-white" />
                         )}
                     </button>
 
@@ -221,9 +221,9 @@ const GameOverlay = () => {
                         className={TOGGLE_BUTTON_CLASS}
                     >
                         {voiceEnabled ? (
-                            <MicOnIcon className="w-10 h-auto text-white" />
+                            <MicOnIcon className="w-8 sm:w-10 h-auto text-white" />
                         ) : (
-                            <MicOffIcon className="w-10 h-auto text-white" />
+                            <MicOffIcon className="w-8 sm:w-10 h-auto text-white" />
                         )}
                     </button>
                     
@@ -238,9 +238,9 @@ const GameOverlay = () => {
                         className={TOGGLE_BUTTON_CLASS}
                     >
                         {soundEnabled ? (
-                            <SoundOnIcon className="w-10 h-auto text-white" />
+                            <SoundOnIcon className="w-8 sm:w-10 h-auto text-white" />
                         ) : (
-                            <SoundOffIcon className="w-10 h-auto text-white" />
+                            <SoundOffIcon className="w-8 sm:w-10 h-auto text-white" />
                         )}
                     </button>
     
@@ -309,11 +309,12 @@ const GameOverlay = () => {
                         aria-label="Copy room id"
                         onClick={handleCopyRoomIdClick}
                         disabled={!currentRoomId}
-                        className="flex flex-row items-center self-center gap-2.5 rounded-4xl bg-[rgba(85,85,85,0.5)] px-4 py-2.5 transition-colors duration-200
-                            hover:cursor-pointer hover:bg-[rgba(85,85,85,0.8)] focus-visible:bg-[rgba(85,85,85,0.8)] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="hidden xs2:flex flex-row items-center self-center gap-2.5 rounded-4xl bg-[rgba(85,85,85,0.5)] px-4 py-2.5 transition-colors duration-200
+                            hover:cursor-pointer hover:bg-[rgba(85,85,85,0.8)] focus-visible:bg-[rgba(85,85,85,0.8)] disabled:cursor-not-allowed disabled:opacity-60
+                            text-sm sm:text-[1rem] whitespace-nowrap"
                     >
-                        <p>Room <span className="text-primary">{currentRoomId}</span></p>
-                        <CopyIcon className="w-5 h-auto text-white" />
+                        <p><span className="hidden xs:inline">Room</span> <span className="text-primary">{currentRoomId}</span></p>
+                        <CopyIcon className="w-4 sm:w-5 h-auto text-white" />
                     </button>
 
                     {/* Settings */}
@@ -328,15 +329,29 @@ const GameOverlay = () => {
                             }}
                             className={TOGGLE_BUTTON_CLASS}
                         >
-                            <SettingsIcon className={`w-10 h-auto ${isSettingsEnabled ? "text-primary" : "text-white"}`} />
+                            <SettingsIcon className={`w-8 sm:w-10 h-auto ${isSettingsEnabled ? "text-primary" : "text-white"}`} />
                         </button>
 
                         {/* Settings dropdown */}
                         <div
                             aria-hidden={!isSettingsEnabled}
-                            className={`flex flex-col absolute p-5 right-0 gap-4 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all duration-200 ease-out 
-                                ${isSettingsEnabled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"}`}
+                            className={`text-sm sm:text-[1rem] flex flex-col absolute p-5 right-0 gap-4 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all 
+                                duration-200 ease-out ${isSettingsEnabled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"}`}
                         >
+                            {/* room code on small screens */}
+                            <button
+                                type="button"
+                                aria-label="Copy room id"
+                                onClick={handleCopyRoomIdClick}
+                                disabled={!currentRoomId}
+                                className="xs2:hidden flex flex-row items-center self-center gap-2.5 
+                                    hover:cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                <p>Room Code: <span className="text-primary">{currentRoomId}</span></p>
+                                <CopyIcon className="w-4 sm:w-5 h-auto text-white" />
+                            </button>
+                            <hr className="xs2:hidden" />
+
                             {/* Toggles */}
                             <div className="flex flex-col gap-1.5">
                                 <div className="flex flex-row justify-between gap-4">

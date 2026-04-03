@@ -7,19 +7,19 @@ export const LANDING_PRIMARY_BUTTON_CLASS = `py-1.5 px-15 rounded-full bg-primar
     active:scale-[0.99] active:brightness-95 active:shadow-[0_4px_10px_rgba(0,0,0,0.2)] 
     disabled:opacity-70 disabled:hover:cursor-default disabled:hover:brightness-100 disabled:hover:shadow-none disabled:active:scale-100 disabled:active:brightness-100 disabled:active:shadow-none`;
 
-export const LANDING_SECONDARY_BUTTON_CLASS = "text-primary text-xl hover:cursor-pointer underline";
+export const LANDING_SECONDARY_BUTTON_CLASS = "text-primary text-[0.75rem] xs2:text-lg text-xl hover:cursor-pointer underline";
 
 export const LandingShell = ({ headerContent, children }) => {
     return (
         <div className="absolute inset-0 flex flex-col justify-center items-center gap-6">
             {/* Title */}
             <div className="flex flex-row gap-2.5 px-5 py-2.5 justify-center items-center bg-[rgba(246,166,81,0.7)] rounded-4xl">
-                <img src={ShibaInuFace} alt="Shiba Inu logo" />
-                <h1 className="text-[4rem]">SHIBA_WORLD</h1>
+                <img className="w-20 xs2:w-22 xs:w-24 sm:w-27.5 sm:h-auto" src={ShibaInuFace} alt="Shiba Inu logo" />
+                <h1 className="text-[2rem] xs2:text-[2.5rem] xs:text-[3rem] sm:text-[4rem]">SHIBA_WORLD</h1>
             </div>
 
             {/* Main card */}
-            <div className="text-2xl text-center flex flex-col gap-5 px-10 py-10 bg-[rgba(29,29,29,0.7)] rounded-xl w-[clamp(375px,46rem,90vw)]">
+            <div className="text-[1rem] xs2:text-xl sm:text-2xl text-center flex flex-col gap-5 px-8 py-8 sm:px-10 sm:py-10 bg-[rgba(29,29,29,0.7)] rounded-xl w-[clamp(360px,46rem,90vw)]">
                 {headerContent}
                 <hr />
                 {children}
@@ -43,7 +43,7 @@ export const NameInputField = ({ inputRef, value, isInvalid, onChange }) => {
                 maxLength={PLAYER_NAME_MAX_LENGTH}
                 required
                 aria-invalid={isInvalid}
-                className="min-w-90 bg-white rounded-full py-1 px-4 text-black"
+                className="min-w-80 xs2:min-w-85 xs:min-w-90 bg-white rounded-full py-1 px-4 text-black"
                 onChange={onChange}
             />
         </div>
