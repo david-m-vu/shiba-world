@@ -1101,6 +1101,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
 
             let payload;
 
+            // if no video id extracted from input, we then try searching with youtube search list
             if (USE_MOCK_YOUTUBE_SEARCH) {
                 payload = await new Promise((resolve) => {
                     setTimeout(() => {

@@ -233,14 +233,16 @@ const getWatchTogetherState = (room) => {
 };
 
 // applies mutation function on room watchTogether state then sanitizes and updates metadata
-const applyWatchMutation = (room, socketId, mutate) => {
+const applyWatchMutation = (room, socketId, mutate, { refreshAnchorServerTs = true } = {}) => {
     const watchTogether = getWatchTogetherState(room);
     mutate(watchTogether);
 
     const nowMs = Date.now();
     watchTogether.version = Math.max(0, toFiniteNumber(watchTogether.version, 0)) + 1;
     watchTogether.updatedBy = socketId;
-    watchTogether.anchorServerTsMs = nowMs;
+    if (refreshAnchorServerTs) {
+        watchTogether.anchorServerTsMs = nowMs;
+    }
     watchTogether.updatedAt = new Date(nowMs).toISOString();
 
     // keep queue/index coherent after every command
@@ -620,6 +622,10 @@ export const applyWatchTogetherCommand = (socketId, commandPayload = {}) => {
         throw new Error("Watch command type is required.");
     }
 
+    // we don't want queue:add, for example, to update playback time by setting anchorServerTsMs, since it sometimes doesn't update anchorTimeSec
+    const shouldRefreshAnchorServerTs = commandType.startsWith("playback:")
+        || commandType === "queue:set-index";
+
     const nextWatchState = applyWatchMutation(room, socketId, (watchTogether) => {
         switch (commandType) {
             case "queue:add": {
@@ -750,6 +756,8 @@ export const applyWatchTogetherCommand = (socketId, commandPayload = {}) => {
             default:
                 throw new Error(`Unsupported watch command type "${commandType}".`);
         }
+    }, {
+        refreshAnchorServerTs: shouldRefreshAnchorServerTs,
     });
 
     return {
