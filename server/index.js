@@ -27,6 +27,16 @@ const SHUTDOWN_GRACE_PERIOD_MS = Number(process.env.SHUTDOWN_GRACE_PERIOD_MS ?? 
 const ROOM_STORE_DRIVER = String(process.env.ROOM_STORE_DRIVER ?? "memory").trim().toLowerCase();
 const REDIS_URL = String(process.env.REDIS_URL ?? "").trim();
 const ROOM_STORE_KEY_PREFIX = String(process.env.ROOM_STORE_KEY_PREFIX ?? "shiba-world").trim() || "shiba-world";
+const parsePositiveInt = (value, fallback) => {
+    const parsedValue = Number.parseInt(String(value ?? ""), 10);
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+        return fallback;
+    }
+
+    return parsedValue;
+};
+const ROOM_STORE_ROOM_TTL_SECONDS = parsePositiveInt(process.env.ROOM_STORE_ROOM_TTL_SECONDS, 86400);
+const ROOM_STORE_SOCKET_TTL_SECONDS = parsePositiveInt(process.env.ROOM_STORE_SOCKET_TTL_SECONDS, ROOM_STORE_ROOM_TTL_SECONDS);
 
 let isShuttingDown = false;
 const normalizeOrigin = (value) => {
@@ -144,11 +154,13 @@ const initializeRoomStore = async () => {
     const redisRoomStore = await createRedisRoomStore({
         redisUrl: REDIS_URL,
         keyPrefix: ROOM_STORE_KEY_PREFIX,
+        roomTtlSeconds: ROOM_STORE_ROOM_TTL_SECONDS,
+        socketRoomTtlSeconds: ROOM_STORE_SOCKET_TTL_SECONDS,
     });
 
     // store the object reference of the RedisRoomStore object in memory
     setRoomStore(redisRoomStore);
-    console.log(`RoomStore driver: redis (${ROOM_STORE_KEY_PREFIX})`);
+    console.log(`RoomStore driver: redis (${ROOM_STORE_KEY_PREFIX}, roomTTL=${ROOM_STORE_ROOM_TTL_SECONDS}s, socketTTL=${ROOM_STORE_SOCKET_TTL_SECONDS}s)`);
 };
 
 const startServer = async () => {

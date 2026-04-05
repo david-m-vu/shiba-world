@@ -105,6 +105,8 @@ const parseRoomSnapshot = (rawValue) => {
 export const createRedisRoomStore = async ({
     redisUrl,
     keyPrefix = "shiba-world",
+    roomTtlSeconds = 86400,
+    socketRoomTtlSeconds = roomTtlSeconds,
     lockTtlMs = 3000,
     lockAcquireTimeoutMs = 1500,
     lockRetryDelayMs = 25,
@@ -132,6 +134,28 @@ export const createRedisRoomStore = async ({
     const roomKey = (roomId) => `${keyPrefix}:room:${roomId}`; // stores the full serialized room state
     const roomLockKey = (roomId) => `${keyPrefix}:room-lock:${roomId}`; // stores the temporary lock token for room-level write locking (to avoid concurrent mutation races)
     const socketRoomKey = (socketId) => `${keyPrefix}:socket-room:${socketId}`; // stores mapping from a socketto its current room, so we can quickly resolve "which room is this socket in?". Replaces socketToRoomId map
+    
+    const safeRoomTtlSeconds = Number.isFinite(Number(roomTtlSeconds)) && Number(roomTtlSeconds) > 0
+        ? Math.floor(Number(roomTtlSeconds))
+        : 86400;
+
+    const safeSocketRoomTtlSeconds = Number.isFinite(Number(socketRoomTtlSeconds)) && Number(socketRoomTtlSeconds) > 0
+        ? Math.floor(Number(socketRoomTtlSeconds))
+        : safeRoomTtlSeconds;
+
+    const safeLockTtlMs = Number.isFinite(Number(lockTtlMs)) && Number(lockTtlMs) > 0
+        ? Math.floor(Number(lockTtlMs))
+        : 3000;
+
+    const setSocketRoomMapping = async (socketId, roomId) => {
+        await client.set(socketRoomKey(socketId), roomId, {
+            EX: safeSocketRoomTtlSeconds,
+        });
+    };
+
+    const deleteSocketRoomMapping = async (socketId) => {
+        await client.del(socketRoomKey(socketId));
+    };
 
     const getRoomIdForSocket = async (socketId) => {
         const safeSocketId = String(socketId ?? "").trim();
@@ -154,7 +178,9 @@ export const createRedisRoomStore = async ({
     };
 
     const saveRoom = async (room) => {
-        await client.set(roomKey(room.id), JSON.stringify(serializeRoom(room)));
+        await client.set(roomKey(room.id), JSON.stringify(serializeRoom(room)), {
+            EX: safeRoomTtlSeconds,
+        });
     };
 
     const releaseLock = async (lockKey, lockToken) => {
@@ -172,9 +198,26 @@ export const createRedisRoomStore = async ({
         }
     };
 
+    // returns true if renew lock successful
+    const renewLock = async (lockKey, lockToken) => {
+        // only extend ttl if we still own the lock
+        // PEXPIRE sets (or resets) a key's TTL in milliseconds
+        const renewScript = "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('PEXPIRE', KEYS[1], ARGV[2]) else return 0 end";
+        try {
+            const result = await client.eval(renewScript, {
+                keys: [lockKey],
+                arguments: [lockToken, String(safeLockTtlMs)],
+            });
+            return Number(result) === 1;
+        } catch {
+            return false;
+        }
+    };
+
     // we use locks even though javascript is single threaded because we can have concurrent writes
     // through multiple server instances, multiple overlappingasync handlers in one instance, multiple clients hitting the same room simultaneously
-    // acquire this lock when a method needs to read room state, mutate it, AND write it back
+    // acquire this lock when a method needs to read room state, mutate it, AND write it back.
+    // if lock acquisition fails, throws an error
     const withRoomLock = async (roomId, operation) => {
         const safeRoomId = String(roomId ?? "").trim();
         if (!safeRoomId) {
@@ -182,14 +225,14 @@ export const createRedisRoomStore = async ({
         }
 
         const lockKey = roomLockKey(safeRoomId);
-        const lockToken = randomUUID(); // this token acts as the id of the owner of the lock if claimed
+        const lockToken = randomUUID(); // this token acts as the about-to-be id of the acquirer of the lock if claimed
         // deadline for trying to acquire the room lock. Keeps retrying lock acquisition until this timestamp
         const lockDeadline = Date.now() + lockAcquireTimeoutMs; 
 
         while (Date.now() < lockDeadline) {
             const result = await client.set(lockKey, lockToken, {
                 NX: true, // set only if key does not already exist (acquire lock only if free)
-                PX: lockTtlMs, // set key expiration in ms (auto-release after TTL)
+                PX: safeLockTtlMs, // set key expiration in ms (auto-release after TTL)
             });
 
             if (result === "OK") {
@@ -205,10 +248,44 @@ export const createRedisRoomStore = async ({
             throw new Error("Failed to acquire room lock.");
         }
 
+        let stopRenewal = false;
+        let lockLost = false;
+        const renewIntervalMs = Math.max(250, Math.floor(safeLockTtlMs / 3));
+        
+        // this loop runs forever until process holding lock is finished or process dies / crashes
+        const runRenewLoop = async () => {
+            while (!stopRenewal && !lockLost) {
+                await sleep(renewIntervalMs);
+                if (stopRenewal || lockLost) {
+                    break;
+                }
+
+                const renewed = await renewLock(lockKey, lockToken);
+                // if renew fails, you can no longer prove you still exclusively own the lock because the TTL may have expired
+                // and another writer may already hold it. COntinuing mutation would risk concurrent writes / races, so the code aborts
+                if (!renewed) {
+                    lockLost = true;
+                    break;
+                }
+            }
+        };
+
+        // calling runRenewLoop without immediate await starts it in the background, so the main flow can continue into operation()
+        const renewPromise = runRenewLoop();
+        const assertLockHeld = () => {
+            if (lockLost) {
+                throw new Error("Room lock was lost during mutation.");
+            }
+        };
+
         // if we're here, we've acquired the lock
         try {
-            return await operation();
-        } finally {
+            const result = await operation({ assertLockHeld }); // call assertLockHeld before critical writes to room state
+            assertLockHeld(); // make sure lock was held during the mutation, and right before returning
+            return result;
+        } finally { // finally code still runs after returns
+            stopRenewal = true;
+            await renewPromise; // await renewPromise to let the while loop exit after stopRenewal = true. Avoids overlap/racy lock operations during cleanup
             await releaseLock(lockKey, lockToken);
         }
     };
@@ -268,7 +345,8 @@ export const createRedisRoomStore = async ({
             const nextRoomId = createRoomId();
             const snapshot = createSerializedRoomForId(nextRoomId);
             const result = await client.set(roomKey(nextRoomId), JSON.stringify(snapshot), {
-                NX: true, // make sure nextRoomId isn'y already taken
+                NX: true, // make sure nextRoomId isn't already taken
+                EX: safeRoomTtlSeconds, // ex is the same as px but expires after N seconds instead of milliseconds
             });
 
             if (result === "OK") {
@@ -281,7 +359,7 @@ export const createRedisRoomStore = async ({
             throw new Error("Failed to create room. Please try again.");
         }
 
-        await client.set(socketRoomKey(safeSocketId), createdRoomSnapshot.id);
+        await setSocketRoomMapping(safeSocketId, createdRoomSnapshot.id);
 
         return {
             createdPlayer,
@@ -301,7 +379,7 @@ export const createRedisRoomStore = async ({
             throw new Error("Socket ID is required.");
         }
 
-        return withRoomLock(safeRoomId, async () => {
+        return withRoomLock(safeRoomId, async ({ assertLockHeld }) => {
             const room = await getRoomById(safeRoomId);
             if (!room) {
                 throw new Error("Room not found.");
@@ -319,8 +397,10 @@ export const createRedisRoomStore = async ({
             const player = createPlayer({ id: safeSocketId, name: playerName });
             room.players.set(safeSocketId, player);
             const joinSystemMessage = appendRoomMessage(room, createSystemChatMessage(`${player.name} has joined.`));
+            assertLockHeld(); // make sure we have the lock before saving room because ttl might have expired while we had the lock acquired
             await saveRoom(room);
-            await client.set(socketRoomKey(safeSocketId), safeRoomId);
+            assertLockHeld(); // so we don't create a mapping for a join whose locked room mutation may no longer be trustworthy
+            await setSocketRoomMapping(safeSocketId, safeRoomId);
 
             return {
                 player,
@@ -342,9 +422,9 @@ export const createRedisRoomStore = async ({
             return null;
         }
 
-        await client.del(socketRoomKey(safeSocketId));
-
-        return withRoomLock(assignedRoomId, async () => {
+        // run room mutation first, then socket mapping cleanup in redis
+        // this reduces orphan risk during failures because room record is the source of truth
+        const departureObj = await withRoomLock(assignedRoomId, async ({ assertLockHeld }) => {
             const room = await getRoomById(assignedRoomId);
             if (!room) {
                 return {
@@ -365,6 +445,8 @@ export const createRedisRoomStore = async ({
             }
 
             if (room.players.size === 0) {
+                // if delete ever fails, TTL is the fallback that eventually expires the room key when activity stops
+                assertLockHeld(); // make sure we have lock before we delete the room (ex: another writer might have joined / updated room after taking the lock if expired)
                 await client.del(roomKey(assignedRoomId));
                 return {
                     roomId: assignedRoomId,
@@ -381,6 +463,7 @@ export const createRedisRoomStore = async ({
                 ? `${leavingPlayerName} has left. ${nextHostPlayerName} is the new host.`
                 : `${leavingPlayerName} has left.`;
             const leaveSystemMessage = appendRoomMessage(room, createSystemChatMessage(statusMessage));
+            assertLockHeld();
             await saveRoom(room);
 
             return {
@@ -391,6 +474,14 @@ export const createRedisRoomStore = async ({
                 systemMessage: leaveSystemMessage,
             };
         });
+
+        try {
+            await deleteSocketRoomMapping(safeSocketId);
+        } catch {
+            // no-op; mapping will eventually expire via TTL
+        }
+
+        return departureObj;
     };
 
     const updatePlayerStateBySocket = async (socketId, nextState) => {
@@ -400,7 +491,7 @@ export const createRedisRoomStore = async ({
             throw new Error("Socket is not assigned to a room.");
         }
 
-        return withRoomLock(assignedRoomId, async () => {
+        return withRoomLock(assignedRoomId, async ({ assertLockHeld }) => {
             const room = await getRoomById(assignedRoomId);
             if (!room) {
                 throw new Error("Room not found.");
@@ -413,6 +504,7 @@ export const createRedisRoomStore = async ({
 
             applyPlayerState(player, nextState);
             touchRoom(room);
+            assertLockHeld();
             await saveRoom(room);
 
             return {
@@ -429,7 +521,7 @@ export const createRedisRoomStore = async ({
             throw new Error("Socket is not assigned to a room.");
         }
 
-        return withRoomLock(assignedRoomId, async () => {
+        return withRoomLock(assignedRoomId, async ({ assertLockHeld }) => {
             const room = await getRoomById(assignedRoomId);
             if (!room) {
                 throw new Error("Room not found.");
@@ -460,6 +552,7 @@ export const createRedisRoomStore = async ({
 
             touchRoom(room);
             const updatedObject = room.objects.get(objectId);
+            assertLockHeld();
             await saveRoom(room);
 
             return {
@@ -476,7 +569,7 @@ export const createRedisRoomStore = async ({
             throw new Error("Socket is not assigned to a room.");
         }
 
-        return withRoomLock(assignedRoomId, async () => {
+        return withRoomLock(assignedRoomId, async ({ assertLockHeld }) => {
             const room = await getRoomById(assignedRoomId);
             if (!room) {
                 throw new Error("Room not found.");
@@ -496,6 +589,7 @@ export const createRedisRoomStore = async ({
             player.activeMessage = messageObj.text;
             player.updatedAt = messageObj.createdAt;
             appendRoomMessage(room, messageObj);
+            assertLockHeld();
             await saveRoom(room);
 
             return {
@@ -513,7 +607,7 @@ export const createRedisRoomStore = async ({
             throw new Error("Socket is not assigned to a room.");
         }
 
-        return withRoomLock(assignedRoomId, async () => {
+        return withRoomLock(assignedRoomId, async ({ assertLockHeld }) => {
             const room = await getRoomById(assignedRoomId);
             if (!room) {
                 throw new Error("Room not found.");
@@ -524,6 +618,7 @@ export const createRedisRoomStore = async ({
             }
 
             const nextWatchState = applyWatchCommandToRoom(room, safeSocketId, commandPayload);
+            assertLockHeld();
             await saveRoom(room);
 
             return {
