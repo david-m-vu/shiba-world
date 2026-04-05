@@ -1,19 +1,9 @@
 /*
  * Notes:
- * currently we're using the socket id on connection as the player id, which means that after a refresh, they will get a new socket.id
+ * currently we're using the socket id on connection as the player id, which means that after a refresh, they will get a new player id / socket.id
  */
 
-import {
-    addChatMessage,
-    applyWatchTogetherCommand,
-    createRoom,
-    getRoomIdBySocket,
-    getRoomSnapshot,
-    joinRoom,
-    leaveRoom,
-    updatePlayerState,
-    updateWorldObjectState,
-} from "../world/rooms.js";
+import { getRoomStore } from "../world/room-store/index.js";
 
 // this function lets the client know that they just left a room
 const emitDeparture = (io, socket, departureObj) => {
@@ -55,18 +45,19 @@ const emitRoomError = (socket, callback, error) => {
 };
 
 export const registerSocketHandlers = (io, socket) => {
+    const roomStore = getRoomStore();
     console.log(`${socket.id} connected`)
 
     // room:create does three things: leaves previous room (if any), creates a new room, and place the creator into it
     // payload is an object of { playerName, worldType }
-    socket.on("room:create", (payload = {}, callback) => {
+    socket.on("room:create", async (payload = {}, callback) => {
         try {
             // if the socket is already in some old room, remove it from that old room first, and notify that old room that the player left
-            const departureObj = leaveRoom(socket.id);
+            const departureObj = await roomStore.leaveRoom(socket.id);
             emitDeparture(io, socket, departureObj);
 
             // create a brand new room
-            const createdRoomObj = createRoom({
+            const createdRoomObj = await roomStore.createRoom({
                 socketId: socket.id,
                 playerName: payload.playerName,
                 worldType: payload.worldType,
@@ -93,7 +84,7 @@ export const registerSocketHandlers = (io, socket) => {
 
     // note that room:join is only for another user entering an existing room.
     // payload is an object of { roomId, playerName } 
-    socket.on("room:join", (payload = {}, callback) => {
+    socket.on("room:join", async (payload = {}, callback) => {
         try {
             const targetRoomId = String(payload.roomId ?? "").trim();
             if (!targetRoomId) {
@@ -101,10 +92,10 @@ export const registerSocketHandlers = (io, socket) => {
             }
 
             // leave the room they were in before if they were in one
-            const departureObj = leaveRoom(socket.id);
+            const departureObj = await roomStore.leaveRoom(socket.id);
             emitDeparture(io, socket, departureObj);
 
-            const joinedRoomObj = joinRoom({
+            const joinedRoomObj = await roomStore.joinRoom({
                 roomId: targetRoomId,
                 socketId: socket.id,
                 playerName: payload.playerName,
@@ -142,26 +133,34 @@ export const registerSocketHandlers = (io, socket) => {
         }
     });
 
-    socket.on("room:leave", (_payload = {}, callback) => {
-        const departureObj = leaveRoom(socket.id);
-        emitDeparture(io, socket, departureObj);
-        acknowledge(callback, { ok: true, roomId: departureObj?.roomId ?? null });
+    socket.on("room:leave", async (_payload = {}, callback) => {
+        try {
+            const departureObj = await roomStore.leaveRoom(socket.id);
+            emitDeparture(io, socket, departureObj);
+            acknowledge(callback, { ok: true, roomId: departureObj?.roomId ?? null });
+        } catch (error) {
+            emitRoomError(socket, callback, error);
+        }
     });
 
     // return the state of the room, which contains all the players
     // use this from the client in cases where: client refreshes local UI state and wants to resync from server, reconnect happeened, 
     // client suspects it missed some events, or if we want to add a "refresh room state" action
     // In short, this is not needed often right now
-    socket.on("room:state", (_payload = {}, callback) => {
-        const roomId = getRoomIdBySocket(socket.id);
-        const room = roomId ? getRoomSnapshot(roomId) : null;
-        acknowledge(callback, { ok: Boolean(room), room });
+    socket.on("room:state", async (_payload = {}, callback) => {
+        try {
+            const roomId = await roomStore.getRoomIdBySocket(socket.id);
+            const room = roomId ? await roomStore.getRoomSnapshot(roomId) : null;
+            acknowledge(callback, { ok: Boolean(room), room });
+        } catch (error) {
+            emitRoomError(socket, callback, error);
+        }
     });
 
     // the payload is an object consisting of the latest player state (just position, rotation, and activeMessage )
-    socket.on("player:update", (payload = {}, callback) => {
+    socket.on("player:update", async (payload = {}, callback) => {
         try {
-            const result = updatePlayerState(socket.id, payload);
+            const result = await roomStore.updatePlayerState(socket.id, payload);
             socket.to(result.roomId).emit("player:state", { // let the rest of the sockets in the room know that theres a new player update
                 player: result.player,
             });
@@ -172,9 +171,9 @@ export const registerSocketHandlers = (io, socket) => {
         }
     });
 
-    socket.on("object:update", (payload = {}, callback) => {
+    socket.on("object:update", async (payload = {}, callback) => {
         try {
-            const result = updateWorldObjectState(socket.id, payload);
+            const result = await roomStore.updateWorldObjectState(socket.id, payload);
             socket.to(result.roomId).emit("object:state", {
                 object: result.object,
             });
@@ -185,9 +184,9 @@ export const registerSocketHandlers = (io, socket) => {
     });
 
     // payload consists of an object with a text property describing the message text
-    socket.on("chat:send", (payload = {}, callback) => {
+    socket.on("chat:send", async (payload = {}, callback) => {
         try {
-            const result = addChatMessage(socket.id, payload.text);
+            const result = await roomStore.addChatMessage(socket.id, payload.text);
 
             // emit to the whole room because the sender also needs the server-authoritative result
             // the sender's own avatar bubble should also update from the same server result
@@ -213,11 +212,11 @@ export const registerSocketHandlers = (io, socket) => {
     // valid commands: 
     // queue:add, queue:remove, queue:set-index, queue:clear
     // playback:play, playback:pause, playback:seek, playback:rate
-    socket.on("watch:command", (payload = {}, callback) => {
+    socket.on("watch:command", async (payload = {}, callback) => {
         try {
             console.log(`watch:command event received from ${socket.id}. Command: ${payload.type}`)
             console.log("payload:", payload)
-            const result = applyWatchTogetherCommand(socket.id, payload);
+            const result = await roomStore.applyWatchTogetherCommand(socket.id, payload);
 
             // emit to the whole room so all clients, including sender, reconcile to server-authoritative watch state
             io.to(result.roomId).emit("watch:state", {
@@ -235,9 +234,14 @@ export const registerSocketHandlers = (io, socket) => {
         }
     });
 
-    socket.on("disconnect", () => {
-        const departureObj = leaveRoom(socket.id);
-        emitDeparture(io, socket, departureObj);
+    socket.on("disconnect", async () => {
+        try {
+            const departureObj = await roomStore.leaveRoom(socket.id);
+            emitDeparture(io, socket, departureObj);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to process disconnect.";
+            console.error(`Disconnect cleanup failed for ${socket.id}: ${message}`);
+        }
 
         console.log(`${socket.id} disconnected`)
     });

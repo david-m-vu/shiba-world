@@ -16,12 +16,17 @@ import youtubeRoutes from "./routes/youtube.js";
 import roomRoutes from "./routes/rooms.js";
 
 import { registerSocketHandlers } from "./socket/handlers.js";
+import { getRoomStore, setRoomStore } from "./world/room-store/index.js";
+import { createRedisRoomStore } from "./world/room-store/redisRoomStore.js";
 
 dotenv.config();
 
 // note render sets an environment variable named PORT for our web service at runtime
 const PORT = Number(process.env.PORT ?? 3001);
 const SHUTDOWN_GRACE_PERIOD_MS = Number(process.env.SHUTDOWN_GRACE_PERIOD_MS ?? 10000);
+const ROOM_STORE_DRIVER = String(process.env.ROOM_STORE_DRIVER ?? "memory").trim().toLowerCase();
+const REDIS_URL = String(process.env.REDIS_URL ?? "").trim();
+const ROOM_STORE_KEY_PREFIX = String(process.env.ROOM_STORE_KEY_PREFIX ?? "shiba-world").trim() || "shiba-world";
 
 let isShuttingDown = false;
 const normalizeOrigin = (value) => {
@@ -122,8 +127,41 @@ io.on("connection", (socket) => {
     registerSocketHandlers(io, socket);
 });
 
-httpServer.listen(PORT, () => {
-    console.log(`Shiba World server listening on http://localhost:${PORT}`);
+const initializeRoomStore = async () => {
+    if (ROOM_STORE_DRIVER === "memory") {
+        console.log("RoomStore driver: memory");
+        return;
+    }
+
+    if (ROOM_STORE_DRIVER !== "redis") {
+        throw new Error(`Unsupported ROOM_STORE_DRIVER "${ROOM_STORE_DRIVER}". Use "memory" or "redis".`);
+    }
+
+    if (!REDIS_URL) {
+        throw new Error("REDIS_URL is required when ROOM_STORE_DRIVER=redis.");
+    }
+
+    const redisRoomStore = await createRedisRoomStore({
+        redisUrl: REDIS_URL,
+        keyPrefix: ROOM_STORE_KEY_PREFIX,
+    });
+
+    // store the object reference of the RedisRoomStore object in memory
+    setRoomStore(redisRoomStore);
+    console.log(`RoomStore driver: redis (${ROOM_STORE_KEY_PREFIX})`);
+};
+
+const startServer = async () => {
+    await initializeRoomStore();
+
+    httpServer.listen(PORT, () => {
+        console.log(`Shiba World server listening on http://localhost:${PORT}`);
+    });
+};
+
+startServer().catch((error) => {
+    console.error("Server bootstrap failed:", error);
+    process.exit(1);
 });
 
 const gracefulShutdown = (signal) => {
@@ -145,12 +183,25 @@ const gracefulShutdown = (signal) => {
         console.log("Socket.IO server closed.");
     });
 
-    httpServer.close((error) => {
+    httpServer.close(async (error) => {
         clearTimeout(forceExitTimeout);
 
         if (error) {
             console.error("HTTP server close failed:", error);
             process.exit(1); // exit code 1 (non-zero) = failure/error
+            return;
+        }
+
+        // before closing the http server, call close. Close in the redis driver closes the connection
+        try {
+            const roomStore = getRoomStore();
+            if (typeof roomStore.close === "function") {
+                await roomStore.close();
+            }
+            
+        } catch (storeCloseError) {
+            console.error("RoomStore close failed:", storeCloseError);
+            process.exit(1);
             return;
         }
 

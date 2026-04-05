@@ -227,7 +227,6 @@ const applyRoomSnapshot = (set, roomSnapshot = {}, selfPlayerId = null) => {
 
 const clearRoomState = (set) => {
     set({
-        localPlayerName: "",
         currentRoomId: null,
         selfPlayerId: null,
         hostSocketId: null,
@@ -1014,6 +1013,7 @@ export const useGameStore = create(
             storage: createJSONStorage(() => localStorage), // createJSONStorage is a zustand helper that handles JSON serialize/deserialize for persisted state - stringifies partial state obj before writing to local storage
             partialize: (state) => ({ // partial state to persist across refreshes. Persist middleware saves only this object to localStorage, not the full zustand state
                 sunsetMode: state.sunsetMode,
+                localPlayerName: state.localPlayerName
             }),
         }
     )

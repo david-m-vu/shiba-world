@@ -1,3 +1,9 @@
+import { customAlphabet } from "nanoid";
+
+const ROOM_ID_LENGTH = 8;
+
+export const roomIdGenerator = customAlphabet("abcdefghijkmnopqrstuvwxyz23456789", ROOM_ID_LENGTH); // note that this excludes capital letters
+
 export const normalizeVector3 = (value, fallback = DEFAULT_OBJECT_POSITION) => {
     if (!Array.isArray(value) || value.length !== 3) {
         return [...fallback];

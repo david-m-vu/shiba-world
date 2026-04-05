@@ -18,7 +18,9 @@ import {
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
 
 const Landing = () => {
-    const [nameInput, setNameInput] = useState("");
+    const localPlayerName = useGameStore((state) => state.localPlayerName);
+    
+    const [nameInput, setNameInput] = useState(localPlayerName ?? "");
     const [roomCodeInput, setRoomCodeInput] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
     const [pendingAction, setPendingAction] = useState("");
@@ -42,6 +44,11 @@ const Landing = () => {
             roomCodeRef.current?.focus();
         }
     }, [isJoinMode]);
+
+    // resync nameInput with localPlayername after persisted-state hydration
+    useEffect(() => {
+        setNameInput(localPlayerName ?? "");
+    }, [localPlayerName]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();

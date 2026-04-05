@@ -11,7 +11,8 @@ import {
 } from "../components/ui/LandingShared.jsx";
 
 const LandingJoin = () => {
-    const [nameInput, setNameInput] = useState("");
+    const localPlayerName = useGameStore((state) => state.localPlayerName);
+    const [nameInput, setNameInput] = useState(localPlayerName ?? "");
     const [errorMessage, setErrorMessage] = useState("");
     const [pendingAction, setPendingAction] = useState("");
 
@@ -27,6 +28,11 @@ const LandingJoin = () => {
     useEffect(() => {
         nameRef.current?.focus();
     }, []);
+
+    // resync nameInput with localPlayername after persisted-state hydration
+    useEffect(() => {
+        setNameInput(localPlayerName ?? "");
+    }, [localPlayerName]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
