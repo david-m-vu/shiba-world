@@ -9,8 +9,8 @@ import {
     createWatchTogetherState,
     appendRoomMessage,
     serializeRoom,
+    applyWatchCommandToRoom
 } from "./roomStateHelpers.js";
-import { applyWatchCommandToRoom } from "./watchTogetherCommands.js";
 
 const rooms = new Map(); // map roomIds to room objects - to get what players are in each room + additional metadata
 const socketToRoomId = new Map(); // map socketIds to RoomIds - to get what rooms each socket belongs to

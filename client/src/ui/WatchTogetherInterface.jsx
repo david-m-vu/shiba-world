@@ -20,454 +20,6 @@ import {
 } from "../lib/watchTogetherHelpers.js";
 
 const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
-const USE_MOCK_YOUTUBE_SEARCH = import.meta.env.VITE_USE_MOCK_YOUTUBE_SEARCH === "true"
-
-const tempSearchResults = {
-    "ok": true,
-    "items": [
-        {
-            "videoId": "ArmDp-zijuc",
-            "title": "NewJeans (뉴진스) 'Super Shy' Official MV",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2023-07-07T03:58:10Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/ArmDp-zijuc/mqdefault.jpg",
-            "viewCount": "277709190",
-            "duration": "PT3M21S"
-        },
-        {
-            "videoId": "sVTy_wmn5SU",
-            "title": "NewJeans (뉴진스) 'OMG' Official MV (Performance ver.1)",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2023-01-03T11:30:01Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/sVTy_wmn5SU/mqdefault.jpg",
-            "viewCount": "387472533",
-            "duration": "PT3M40S"
-        },
-        {
-            "videoId": "ZncbtRo7RXs",
-            "title": "NewJeans (뉴진스) ‘Supernatural’ Official MV (Part.1)",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2024-06-21T04:00:01Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/ZncbtRo7RXs/mqdefault.jpg",
-            "viewCount": "85846987",
-            "duration": "PT3M11S"
-        },
-        {
-            "videoId": "G8GEpK7YDl4",
-            "title": "NewJeans 'New Jeans (ft. The Powerpuff Girls)' Lyrics (뉴진스 New Jeans 가사) (Color Coded Lyrics)",
-            "channelTitle": "Jaeguchi",
-            "publishedAt": "2023-07-07T04:41:58Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/G8GEpK7YDl4/mqdefault.jpg",
-            "viewCount": "16548307",
-            "duration": "PT1M50S"
-        },
-        {
-            "videoId": "xeiqi7uTwDU",
-            "title": "This NewJeans Update Made Things Worse…",
-            "channelTitle": "dramatized",
-            "publishedAt": "2026-03-25T17:58:00Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/xeiqi7uTwDU/mqdefault.jpg",
-            "viewCount": "2715",
-            "duration": "PT4M11S"
-        },
-        {
-            "videoId": "jOTfBlKSQYY",
-            "title": "NewJeans (뉴진스) 'ETA' Official MV",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2023-07-21T03:58:10Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/jOTfBlKSQYY/mqdefault.jpg",
-            "viewCount": "112610798",
-            "duration": "PT3M37S"
-        },
-        {
-            "videoId": "Km71Rr9K-Bw",
-            "title": "NewJeans (뉴진스) 'Ditto' Performance Video",
-            "channelTitle": "NewJeans",
-            "publishedAt": "2022-12-30T10:00:01Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/Km71Rr9K-Bw/mqdefault.jpg",
-            "viewCount": "208346102",
-            "duration": "PT3M10S"
-        },
-        {
-            "videoId": "VOmIplFAGeg",
-            "title": "NewJeans (뉴진스) 'Cookie' Official MV",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2022-08-01T08:58:12Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/VOmIplFAGeg/mqdefault.jpg",
-            "viewCount": "133707507",
-            "duration": "PT3M59S"
-        },
-        {
-            "videoId": "Q3K0TOvTOno",
-            "title": "NewJeans (뉴진스) 'How Sweet' Official MV",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2024-05-24T07:00:00Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/Q3K0TOvTOno/mqdefault.jpg",
-            "viewCount": "73619626",
-            "duration": "PT4M3S"
-        },
-        {
-            "videoId": "3rfwR0BBwyk",
-            "title": "THATS A LOT OF HAIR SPRAY... 💀 #newjeans #njz #kpop",
-            "channelTitle": "WIZBIT",
-            "publishedAt": "2025-10-02T11:50:27Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/3rfwR0BBwyk/mqdefault.jpg",
-            "viewCount": "39272184",
-            "duration": "PT12S"
-        },
-        {
-            "videoId": "11cta61wi0g",
-            "title": "NewJeans (뉴진스) 'Hype Boy' Official MV (Performance ver.1)",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2022-08-18T09:00:01Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/11cta61wi0g/mqdefault.jpg",
-            "viewCount": "241236817",
-            "duration": "PT2M58S"
-        },
-        {
-            "videoId": "mssHvY7O6Fo",
-            "title": "NewJeans (뉴진스) | 'New Jeans' | Color Coded Lyrics |【Rom/Eng/Esp】",
-            "channelTitle": "Snowy토끼",
-            "publishedAt": "2023-08-01T04:44:45Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/mssHvY7O6Fo/mqdefault.jpg",
-            "viewCount": "3292847",
-            "duration": "PT1M49S"
-        },
-        {
-            "videoId": "enz-d4cQq_c",
-            "title": "Dxrkaii, Jiandro - New Jeans (Jersey Club - Slowed Down)",
-            "channelTitle": "TheGoodVibe",
-            "publishedAt": "2025-03-08T16:12:41Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/enz-d4cQq_c/mqdefault.jpg",
-            "viewCount": "15443356",
-            "duration": "PT1M50S"
-        },
-        {
-            "videoId": "Rrf8uQFvICE",
-            "title": "NewJeans (뉴진스) 'Hype Boy' Official MV (MINJI ver.)",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2022-07-23T05:28:15Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/Rrf8uQFvICE/mqdefault.jpg",
-            "viewCount": "30574815",
-            "duration": "PT2M57S"
-        },
-        {
-            "videoId": "K3A26madxok",
-            "title": "Mommy Really Cares About us🌎 | New Jeans Jersey Remix (Miside Mita EditTikTok Version)",
-            "channelTitle": "SAMIR AVENGER GM",
-            "publishedAt": "2025-01-05T18:38:00Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/K3A26madxok/mqdefault.jpg",
-            "viewCount": "6818691",
-            "duration": "PT41S"
-        },
-        {
-            "videoId": "kcelgrGY1h8",
-            "title": "NewJeans (뉴진스) 'New Jeans' Official MV",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2023-07-06T15:00:01Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/kcelgrGY1h8/mqdefault.jpg",
-            "viewCount": "41351891",
-            "duration": "PT3M31S"
-        },
-        {
-            "videoId": "ogklOvuqJH0",
-            "title": "Hype Boy - NewJeans ニュージーンズ  [Music Bank] | KBS WORLD TV 220819",
-            "channelTitle": "KBS WORLD TV",
-            "publishedAt": "2022-08-19T09:28:33Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/ogklOvuqJH0/mqdefault.jpg",
-            "viewCount": "5391427",
-            "duration": "PT3M11S"
-        },
-        {
-            "videoId": "x8RIixqumUc",
-            "title": "NewJeans (뉴진스) 'Attention' Official MV (Performance ver.)",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2022-07-22T03:00:02Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/x8RIixqumUc/mqdefault.jpg",
-            "viewCount": "86729696",
-            "duration": "PT2M58S"
-        },
-        {
-            "videoId": "js1CtxSY38I",
-            "title": "NewJeans (뉴진스) 'Attention' Official MV",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2022-07-21T15:00:14Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/js1CtxSY38I/mqdefault.jpg",
-            "viewCount": "80528102",
-            "duration": "PT4M23S"
-        },
-        {
-            "videoId": "dJdqn5v4Dkw",
-            "title": "NewJeans (뉴진스) 'ASAP' Official MV",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2023-07-25T15:00:02Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/dJdqn5v4Dkw/mqdefault.jpg",
-            "viewCount": "36756406",
-            "duration": "PT2M21S"
-        },
-        {
-            "videoId": "ft70sAYrFyY",
-            "title": "NewJeans (뉴진스) 'Bubble Gum' Official MV",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2024-04-26T15:00:01Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/ft70sAYrFyY/mqdefault.jpg",
-            "viewCount": "82118192",
-            "duration": "PT3M41S"
-        },
-        {
-            "videoId": "kKsivrgoyDw",
-            "title": "NewJeans (뉴진스) 'Cool With You' Official MV (Performance ver.)",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2023-07-20T15:00:02Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/kKsivrgoyDw/mqdefault.jpg",
-            "viewCount": "40556234",
-            "duration": "PT2M28S"
-        },
-        {
-            "videoId": "M5aEiDSx7kI",
-            "title": "NewJeans (뉴진스) 'Supernatural' Lyrics (Color Coded Lyrics)",
-            "channelTitle": "Jaeguchi",
-            "publishedAt": "2024-06-21T06:43:41Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/M5aEiDSx7kI/mqdefault.jpg",
-            "viewCount": "6380702",
-            "duration": "PT3M11S"
-        },
-        {
-            "videoId": "Ec0Z1v7jKDQ",
-            "title": "NewJeans (뉴진스) ‘How Sweet’ Performance Video | Coke Studio",
-            "channelTitle": "NewJeans",
-            "publishedAt": "2024-05-24T15:00:01Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/Ec0Z1v7jKDQ/mqdefault.jpg",
-            "viewCount": "26859546",
-            "duration": "PT3M48S"
-        },
-        {
-            "videoId": "pSUydWEqKwE",
-            "title": "NewJeans (뉴진스) 'Ditto' Official MV (side A)",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2022-12-19T09:00:03Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/pSUydWEqKwE/mqdefault.jpg",
-            "viewCount": "61704612",
-            "duration": "PT5M34S"
-        },
-        {
-            "videoId": "yFTAYXDTjqI",
-            "title": "[K-Choreo 8K HDR] 뉴진스 직캠 'New Jeans' (NewJeans Choreography) @MusicBank 230714",
-            "channelTitle": "KBS Kpop",
-            "publishedAt": "2023-07-14T09:25:42Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/yFTAYXDTjqI/mqdefault.jpg",
-            "viewCount": "12786854",
-            "duration": "PT2M14S"
-        },
-        {
-            "videoId": "s4Ow55AbdCg",
-            "title": "NewJeans (뉴진스) 'ETA' Official MV (Performance ver.)",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2023-07-24T15:00:02Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/s4Ow55AbdCg/mqdefault.jpg",
-            "viewCount": "76270011",
-            "duration": "PT2M36S"
-        },
-        {
-            "videoId": "bd5ZwEvrRSQ",
-            "title": "EVEN THEY CAN'T BELIEVE IT 💀 #newjeans #njz #kpop",
-            "channelTitle": "WIZBIT",
-            "publishedAt": "2025-10-18T12:08:24Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/bd5ZwEvrRSQ/mqdefault.jpg",
-            "viewCount": "6401579",
-            "duration": "PT14S"
-        },
-        {
-            "videoId": "sEsUxLkAYrg",
-            "title": "NewJeans - Tell Me (Original song by Wonder Girls) l 2022 SBS Gayo Daejeon Ep 3",
-            "channelTitle": "KOCOWA TV",
-            "publishedAt": "2022-12-26T04:45:04Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/sEsUxLkAYrg/mqdefault.jpg",
-            "viewCount": "14094755",
-            "duration": "PT2M25S"
-        },
-        {
-            "videoId": "6OMfjwK3X44",
-            "title": "NewJeans - NewJeans [Audio]",
-            "channelTitle": "BLISIT_OFFICIAL",
-            "publishedAt": "2023-07-07T13:44:48Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/6OMfjwK3X44/mqdefault.jpg",
-            "viewCount": "1389210",
-            "duration": "PT1M50S"
-        },
-        {
-            "videoId": "rp4KPJ_r5Pc",
-            "title": "[Full Album] New Jeans - \"Get Up\"",
-            "channelTitle": "KLINA's",
-            "publishedAt": "2023-07-21T14:43:22Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/rp4KPJ_r5Pc/mqdefault.jpg",
-            "viewCount": "12014920",
-            "duration": "PT12M16S"
-        },
-        {
-            "videoId": "n7ePZLn9_lQ",
-            "title": "Super Shy",
-            "channelTitle": "NewJeans - Topic",
-            "publishedAt": "2023-07-21T04:00:32Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/n7ePZLn9_lQ/mqdefault.jpg",
-            "viewCount": "141972485",
-            "duration": "PT2M35S"
-        },
-        {
-            "videoId": "DF3R2NNSqp4",
-            "title": "New Jeans - NewJeans (뉴진스) [Music Bank] | KBS WORLD TV 230714",
-            "channelTitle": "KBS WORLD TV",
-            "publishedAt": "2023-07-14T09:16:23Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/DF3R2NNSqp4/mqdefault.jpg",
-            "viewCount": "11656648",
-            "duration": "PT2M21S"
-        },
-        {
-            "videoId": "DrNtuAgwWgQ",
-            "title": "NewJeans (뉴진스) 'Zero' Performance Video",
-            "channelTitle": "NewJeans",
-            "publishedAt": "2023-04-10T02:00:02Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/DrNtuAgwWgQ/mqdefault.jpg",
-            "viewCount": "8698507",
-            "duration": "PT2M43S"
-        },
-        {
-            "videoId": "pDNltrE3LMo",
-            "title": "ETA - NewJeans ニュージーンズ [Music Bank] | KBS WORLD TV 230804",
-            "channelTitle": "KBS WORLD TV",
-            "publishedAt": "2023-08-04T09:15:53Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/pDNltrE3LMo/mqdefault.jpg",
-            "viewCount": "9124487",
-            "duration": "PT2M38S"
-        },
-        {
-            "videoId": "tVIXY14aJms",
-            "title": "NewJeans (뉴진스) 'Hurt' Official MV",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2022-07-24T15:00:02Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/tVIXY14aJms/mqdefault.jpg",
-            "viewCount": "54885559",
-            "duration": "PT3M2S"
-        },
-        {
-            "videoId": "FKHqiV-9xLA",
-            "title": "NewJeans (뉴진스) 'Supernatural' Dance Practice",
-            "channelTitle": "NewJeans",
-            "publishedAt": "2024-07-24T10:00:01Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/FKHqiV-9xLA/mqdefault.jpg",
-            "viewCount": "9317844",
-            "duration": "PT3M15S"
-        },
-        {
-            "videoId": "Q2yuALEEZuQ",
-            "title": "파워퍼프걸로 변신한 뉴진스 🎀 𝙉𝙚𝙬𝙅𝙚𝙖𝙣𝙨 - 𝙉𝙚𝙬 𝙅𝙚𝙖𝙣𝙨 [한글 가사/해석]",
-            "channelTitle": "이상한 나라의 매디",
-            "publishedAt": "2023-07-07T05:58:23Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/Q2yuALEEZuQ/mqdefault.jpg",
-            "viewCount": "19251735",
-            "duration": "PT1M49S"
-        },
-        {
-            "videoId": "Gw2jHej29QE",
-            "title": "NewJeans (뉴진스) 'Hype Boy' Special Performance Video",
-            "channelTitle": "NewJeans",
-            "publishedAt": "2022-08-13T06:00:00Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/Gw2jHej29QE/mqdefault.jpg",
-            "viewCount": "16065455",
-            "duration": "PT3M3S"
-        },
-        {
-            "videoId": "U8jQLE_mWGs",
-            "title": "NewJeans 'New Jeans' Ι NPOP PREVIEW #1 230802",
-            "channelTitle": "NPOP",
-            "publishedAt": "2023-08-03T09:00:30Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/U8jQLE_mWGs/mqdefault.jpg",
-            "viewCount": "5236742",
-            "duration": "PT2M32S"
-        },
-        {
-            "videoId": "86fJXRuP6Ko",
-            "title": "NewJeans (뉴진스) – Supernatural @인기가요 inkigayo 20240714",
-            "channelTitle": "SBSKPOP X INKIGAYO",
-            "publishedAt": "2024-07-14T08:24:06Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/86fJXRuP6Ko/mqdefault.jpg",
-            "viewCount": "2322772",
-            "duration": "PT3M50S"
-        },
-        {
-            "videoId": "m98euB9IxHU",
-            "title": "New Jeans - Jersey Remix (Slowed)",
-            "channelTitle": "HyperTunes",
-            "publishedAt": "2025-02-25T17:47:41Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/m98euB9IxHU/mqdefault.jpg",
-            "viewCount": "5409719",
-            "duration": "PT1M50S"
-        },
-        {
-            "videoId": "GUvZyGalLQg",
-            "title": "Sweet #다니엘 🤫 #NewJeans #DANIELLE #NI_KI #ENHYPEN #SweetVenom",
-            "channelTitle": "ENHYPEN",
-            "publishedAt": "2024-02-20T11:04:35Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/GUvZyGalLQg/mqdefault.jpg",
-            "viewCount": "10869211",
-            "duration": "PT24S"
-        },
-        {
-            "videoId": "wU2siJ2c5TA",
-            "title": "NewJeans (뉴진스) 'Super Shy' Dance Practice",
-            "channelTitle": "NewJeans",
-            "publishedAt": "2023-07-07T09:00:01Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/wU2siJ2c5TA/mqdefault.jpg",
-            "viewCount": "33013250",
-            "duration": "PT2M42S"
-        },
-        {
-            "videoId": "Y8mML3ZphlI",
-            "title": "It’s giving NEWJEANS😲#NewJeans #뉴진스#NewJeans_NewJeans #NewJeans_GetUp#Time_to_NewJeans",
-            "channelTitle": "NewJeans",
-            "publishedAt": "2023-07-12T08:05:17Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/Y8mML3ZphlI/mqdefault.jpg",
-            "viewCount": "44791392",
-            "duration": "PT14S"
-        },
-        {
-            "videoId": "haCpjUXIhrI",
-            "title": "NewJeans 'Ditto' Lyrics (뉴진스 Ditto 가사) (Color Coded Lyrics)",
-            "channelTitle": "Jaeguchi",
-            "publishedAt": "2022-12-19T10:15:55Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/haCpjUXIhrI/mqdefault.jpg",
-            "viewCount": "25534904",
-            "duration": "PT3M7S"
-        },
-        {
-            "videoId": "A4S8zl50AdM",
-            "title": "NewJeans (뉴진스) ‘Supernatural’ Official MV (Part.2)",
-            "channelTitle": "HYBE LABELS",
-            "publishedAt": "2024-07-04T15:00:01Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/A4S8zl50AdM/mqdefault.jpg",
-            "viewCount": "10773972",
-            "duration": "PT3M11S"
-        },
-        {
-            "videoId": "ueRPcfvo2ts",
-            "title": "NEW JEANS - JERSEY REMIX #nightlyrics #evelyn #newjeans #newjeans",
-            "channelTitle": "Night Lyrics ",
-            "publishedAt": "2025-02-21T16:50:36Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/ueRPcfvo2ts/mqdefault.jpg",
-            "viewCount": "2713907",
-            "duration": "PT12S"
-        },
-        {
-            "videoId": "AqmjGgVFiB0",
-            "title": "New jeans is disbanding!?!?!!! #newjeans #kpop #kpopfypp #kpopnews #news",
-            "channelTitle": "Chae",
-            "publishedAt": "2024-11-21T23:43:27Z",
-            "thumbnailUrl": "https://i.ytimg.com/vi/AqmjGgVFiB0/mqdefault.jpg",
-            "viewCount": "498478",
-            "duration": "PT46S"
-        }
-    ]
-}
 
 const PRESET_OPTIONS = [
     {
@@ -495,6 +47,10 @@ const PRESET_OPTIONS = [
 
 const DEFAULT_PRESET = "trending_music_videos";
 const EMPTY_WATCH_QUEUE = Object.freeze([]); // gives a stable reference so hooks that depend on videoQueue don't think it changed when watchTogether.queue is missing
+const WATCH_VOLUME_MIN = 0;
+const WATCH_VOLUME_MAX = 100;
+const WATCH_VOLUME_POLL_INTERVAL_MS = 500;
+const WATCH_VOLUME_APPLY_SUPPRESS_MS = 350;
 
 const WatchTogetherInterface = ({ isOpen }) => {
     const [isSearching, setIsSearching] = useState(false);
@@ -520,8 +76,11 @@ const WatchTogetherInterface = ({ isOpen }) => {
 
     const suppressPlayerEventsRef = useRef(false);
     const suppressPlayerEventsTimeoutRef = useRef(null);
+    const suppressVolumePollUntilTsRef = useRef(0);
     const videoQueueRef = useRef([]); // use this instead of videoQueue so that it doesn't force callbacks/effects to reinitialize every queue update
     const currentQueueIndexRef = useRef(-1);
+    const localWatchVolumeRef = useRef(100);
+    const localWatchMutedRef = useRef(false);
 
     const watchTogether = useGameStore((state) => state.watchTogether);
 
@@ -533,6 +92,10 @@ const WatchTogetherInterface = ({ isOpen }) => {
     const watchPlay = useGameStore((state) => state.watchPlay);
     const watchPause = useGameStore((state) => state.watchPause);
     const watchSetRate = useGameStore((state) => state.watchSetRate);
+    const watchVolume = useGameStore((state) => state.watchVolume);
+    const watchMuted = useGameStore((state) => state.watchMuted);
+    const setWatchVolume = useGameStore((state) => state.setWatchVolume);
+    const setWatchMuted = useGameStore((state) => state.setWatchMuted);
 
     // variables stemming from global watchTogether state
     const videoQueue = Array.isArray(watchTogether.queue) ? watchTogether.queue : EMPTY_WATCH_QUEUE;
@@ -571,6 +134,13 @@ const WatchTogetherInterface = ({ isOpen }) => {
     useEffect(() => {
         currentQueueIndexRef.current = currentQueueIndex;
     }, [currentQueueIndex]);
+
+    // these refs hold the latest watchVolume / watchMuted for the setInterval callback
+    // since setInterval closes over the ref object, not the ref's current value
+    useEffect(() => {
+        localWatchVolumeRef.current = watchVolume;
+        localWatchMutedRef.current = watchMuted;
+    }, [watchMuted, watchVolume]);
 
     // handle cases where the open queue menu index becomes invalid as a result of deletion
     useEffect(() => {
@@ -698,6 +268,29 @@ const WatchTogetherInterface = ({ isOpen }) => {
         }, durationMs);
     }, []);
 
+    // read zustand state and apply volume to player
+    const applyLocalPlayerVolume = useCallback(() => {
+        if (!playerRef.current || !playerReadyRef.current) {
+            return;
+        }
+
+        suppressVolumePollUntilTsRef.current = Date.now() + WATCH_VOLUME_APPLY_SUPPRESS_MS;
+
+        const parsedVolume = Number(watchVolume);
+        const safeVolume = Number.isFinite(parsedVolume)
+            ? Math.max(WATCH_VOLUME_MIN, Math.min(WATCH_VOLUME_MAX, Math.round(parsedVolume)))
+            : WATCH_VOLUME_MAX;
+
+        playerRef.current.setVolume?.(safeVolume);
+
+        if (watchMuted || safeVolume <= 0) {
+            playerRef.current.mute?.();
+            return;
+        }
+
+        playerRef.current.unMute?.();
+    }, [watchMuted, watchVolume]);
+
     const syncPlayerToWatchState = useCallback(() => {
         if (!playerRef.current || !playerReadyRef.current || !currentVideoId) {
             return;
@@ -810,6 +403,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
                     events: {
                         onReady: () => {
                             playerReadyRef.current = true;
+                            applyLocalPlayerVolume();
                             syncPlayerToWatchState();
                         },
                         onStateChange: async (event) => {
@@ -924,7 +518,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
         return () => {
             cancelled = true;
         };
-    }, [hasQueuedVideos, playbackRate, syncPlayerToWatchState, watchPause, watchPlay, watchSetIndex, watchSetRate]);
+    }, [applyLocalPlayerVolume, hasQueuedVideos, playbackRate, syncPlayerToWatchState, watchPause, watchPlay, watchSetIndex, watchSetRate]);
 
     // destroy the youtube player if there is nothing to play (hasQueuedVideos === false)
     useEffect(() => {
@@ -943,9 +537,51 @@ const WatchTogetherInterface = ({ isOpen }) => {
     // this effect syncs the client side to the server authoritative state with syncPlayerToWatchState whenever it updates
     // syncPlayerToWatchState() is set to update when the global zustand watchTogether state updates, which happens from the socket event listener
     useEffect(() => {
-        console.log("syncing player to watch state")
+        // console.log("syncing player to watch state")
         syncPlayerToWatchState();
     }, [syncPlayerToWatchState]);
+
+    useEffect(() => {
+        applyLocalPlayerVolume();
+    }, [applyLocalPlayerVolume]);
+
+    // YouTube IFrame API has no onVolumeChange event, so poll player volume/mute to capture changes from native controls.
+    useEffect(() => {
+        if (!hasQueuedVideos) {
+            return;
+        }
+
+        const intervalId = window.setInterval(() => {
+            if (!playerRef.current || !playerReadyRef.current) {
+                return;
+            }
+
+            if (Date.now() < suppressVolumePollUntilTsRef.current) {
+                return;
+            }
+
+            const playerVolume = Number(playerRef.current.getVolume?.());
+            if (!Number.isFinite(playerVolume)) {
+                return;
+            }
+
+            const safeVolume = Math.max(WATCH_VOLUME_MIN, Math.min(WATCH_VOLUME_MAX, Math.round(playerVolume)));
+            const isMuted = Boolean(playerRef.current.isMuted?.());
+            const nextMuted = isMuted || safeVolume <= 0;
+
+            if (safeVolume !== localWatchVolumeRef.current) {
+                setWatchVolume(safeVolume);
+            }
+
+            if (nextMuted !== localWatchMutedRef.current) {
+                setWatchMuted(nextMuted);
+            }
+        }, WATCH_VOLUME_POLL_INTERVAL_MS);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [hasQueuedVideos, setWatchMuted, setWatchVolume]);
 
     // handle player cleanup when component unmounts
     useEffect(() => {
@@ -1103,20 +739,12 @@ const WatchTogetherInterface = ({ isOpen }) => {
             let payload;
 
             // if no video id extracted from input, we then try searching with youtube search list
-            if (USE_MOCK_YOUTUBE_SEARCH) {
-                payload = await new Promise((resolve) => {
-                    setTimeout(() => {
-                        resolve(tempSearchResults);
-                    }, 1000)
-                })
-            } else {
-                const response = await fetch(`${SERVER_BASE_URL}/api/youtube/search?q=${encodeURIComponent(safeQuery)}`);
-                payload = await response.json().catch(() => null);
+            const response = await fetch(`${SERVER_BASE_URL}/api/youtube/search?q=${encodeURIComponent(safeQuery)}`);
+            payload = await response.json().catch(() => null);
 
-                if (!response.ok) {
-                    const errorMessage = String(payload?.message ?? "Failed to fetch YouTube videos.");
-                    throw new Error(errorMessage);
-                }
+            if (!response.ok) {
+                const errorMessage = String(payload?.message ?? "Failed to fetch YouTube videos.");
+                throw new Error(errorMessage);
             }
 
             const safeItems = Array.isArray(payload.items) ? payload.items : [];
@@ -1213,6 +841,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
                                     src={video.thumbnailUrl}
                                     alt={video.title || "YouTube thumbnail"}
                                     loading="lazy" // tells browser to delay loading this image until it's near the viewport instead of loading immediately
+                                    draggable={false}
                                 />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-[11px] bg-black/40 text-white/60">
@@ -1366,15 +995,15 @@ const WatchTogetherInterface = ({ isOpen }) => {
             {!isSearching && !searchError && searchResults.length > 0 && (
                 <>
                     {activePresetObj ? (
-                        <p className="mb-2 flex flex-row items-center gap-1 font-medium text-sm text-white/70">
-                            <activePresetObj.IconComponent className={`${activePresetObj.iconClassName} h-5 w-5`}/>
+                        <p className="mb-2 flex flex-row items-center gap-1 font-medium text-xs xs:text-sm text-white/70">
+                            <activePresetObj.IconComponent className={`${activePresetObj.iconClassName} h-4 w-4 xs:h-5 xs:w-5`}/>
                             <span className={`inline-block ${activePresetObj.textStyle}`}>
                                 {activePresetObj.label}
                             </span>
                         </p>
                     ) : null}
 
-                    <ul className={`grid gap-3 ${hasQueuedVideos ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
+                    <ul className={`grid gap-3 ${hasQueuedVideos ? "grid-cols-2 xs:grid-cols-1 md:grid-cols-2" : "grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
                         {renderedSearchResults}
                     </ul>
                 </>
@@ -1390,14 +1019,14 @@ const WatchTogetherInterface = ({ isOpen }) => {
         >
             <section
                 ref={panelRef}
-                className={`relative flex flex-col w-[min(95vw,70rem)] h-[min(80vh,40rem)] rounded-lg border border-white/15 bg-[rgba(41,41,41,0.9)] p-4 text-white shadow-2xl transition-all duration-200 ease-out ${
+                className={`relative flex flex-col w-[min(95vw,70rem)] h-[98vh] xs:h-[min(80vh,40rem)] rounded-lg border border-white/15 bg-[rgba(41,41,41,0.9)] p-4 text-white shadow-2xl transition-all duration-200 ease-out ${
                     isOpen ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0"
                 }`}
             >
                 {/* headers and inputs */}
-                <div className="grid items-start gap-3
+                <div className="grid items-center gap-3
                     grid-cols-[minmax(0,1fr)_auto]
-                    sm:items-center sm:grid-cols-[auto_minmax(9.5rem,1fr)_auto]
+                    sm:grid-cols-[auto_minmax(9.5rem,1fr)_auto]
                     lg:grid-cols-[clamp(10rem,16vw,12rem)_minmax(9.5rem,1fr)_clamp(1.5rem,16vw,12rem)]"
                 >
                     {/* title */}
@@ -1455,7 +1084,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
                                 aria-haspopup="menu"
                                 aria-expanded={isPresetDropdownOpen}
                                 aria-controls="watch-together-preset-menu" // links a control element to the element it controls
-                                className="w-full flex flex-row items-center justify-between gap-1 px-2.5 py-2 rounded-full border border-white/30 bg-[rgba(41,41,41,0.7)] text-sm
+                                className="w-full flex flex-row items-center justify-between gap-1 px-2.5 py-1.5 xs:py-2 rounded-full border border-white/30 bg-[rgba(41,41,41,0.7)] text-xs xs:text-sm
                                     cursor-pointer hover:border-white/40 hover:bg-[rgba(60,60,60,0.7)] active:border-white/50 active:bg-[rgba(64,64,64,0.7)] transition-colors"
                                 onClick={() => {
                                     setIsPresetDropdownOpen((prev) => !prev);
@@ -1474,7 +1103,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
                                 id="watch-together-preset-menu"
                                 role="menu"
                                 aria-hidden={!isPresetDropdownOpen}
-                                className={`absolute z-40 top-[calc(100%+2px)] left-0 w-full xs:w-max xs:min-w-50 xs:max-w-88 max-w-[90vw] flex flex-col items-start rounded-lg shadow-lg bg-[rgba(41,41,41,1)] transition-all
+                                className={`absolute z-40 top-[calc(100%+2px)] left-0 w-full xs:w-max xs:min-w-44 xs:max-w-80 max-w-[90vw] flex flex-col items-start rounded-lg shadow-lg bg-[#202020] transition-all
                                 ${isPresetDropdownOpen ? "translate-y-0 opacity-100" : "-translate-y-1 opacity-0 pointer-events-none"}
                                 overflow-hidden`}
                             >
@@ -1486,7 +1115,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
                                             type="button"
                                             role="menuitem"
                                             tabIndex={isPresetDropdownOpen ? 0 : -1}
-                                            className="flex flex-row w-full items-center gap-1 px-2.5 py-2 text-sm whitespace-nowrap
+                                            className="flex flex-row w-full items-center gap-1 px-2.5 py-2 text-xs sm:text-sm whitespace-nowrap
                                                 first:rounded-t-lg last:rounded-b-lg cursor-pointer hover:bg-[rgba(60,60,60,1)] active:bg-[rgba(64,64,64,1)] transition-colors"
                                             onClick={() => {
                                                 handlePresetChange(presetObj.value)
@@ -1515,10 +1144,10 @@ const WatchTogetherInterface = ({ isOpen }) => {
 
                 {/* if queuedVideos, left side player + queue - right side search results. Else, all search results */}
                 {hasQueuedVideos ? (
-                    <div className="font-['Roboto'] mt-2 flex-1 min-h-0 grid grid-cols-1 gap-4 xs:grid-cols-[minmax(20rem,2fr)_minmax(0,3fr)]">
+                    <div className="font-['Roboto'] mt-2 flex-1 min-h-0 grid grid-cols-1 grid-rows-[minmax(0,3fr)_minmax(0,2fr)] gap-4 xs:grid-cols-[minmax(20rem,2fr)_minmax(0,3fr)] xs:grid-rows-1">
                         {/* player + queue */}
                         <div className="min-h-0 flex flex-col">
-                            <div className="w-full overflow-hidden rounded-xl border border-white/20 bg-black aspect-video">
+                            <div className="w-full shrink-0 overflow-hidden rounded-xl border border-white/20 bg-black aspect-video">
                                 <div ref={playerHostRef} className="w-full h-full" />
                             </div>
 
@@ -1526,12 +1155,13 @@ const WatchTogetherInterface = ({ isOpen }) => {
                                 <p className="mt-2 text-sm text-red-300">{playerError}</p>
                             ) : null}
 
-                            <div className="mt-3 flex items-center justify-between gap-3">
-                                <p className="text-md font-medium text-white/90">Shared Queue</p>
-                                <p className="text-xs tracking-wide text-white/60">Video {currentQueueIndex + 1}/{videoQueue.length}</p>
+                            {/* queue */}
+                            <div className="mt-2 xs:mt-3 flex items-center justify-between gap-3">
+                                <p className="text-xs xs:text-sm font-medium text-white/90">Shared Queue</p>
+                                <p className="text-[10px] tracking-wide text-white/60">Video {currentQueueIndex + 1}/{videoQueue.length}</p>
                             </div>
 
-                            <div className="mt-2 flex-1 min-h-25 overflow-y-auto pr-1 app-scroll">
+                            <div className="mt-2 flex-1 overflow-y-auto pr-1 app-scroll">
                                 <ul className="flex flex-col gap-2">
                                     {renderedQueueItems}
                                 </ul>
@@ -1539,7 +1169,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
                         </div>
 
                         {/* search content */}
-                        <div className="min-h-0 mt-1 overflow-y-auto pr-1 app-scroll">
+                        <div className="min-h-0 mt-0 xs:mt-1 overflow-y-auto pr-1 app-scroll">
                             {isOpen ? searchContent : null}
                         </div>
                     </div>
@@ -1572,7 +1202,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
                             className="flex flex-row gap-2 w-full px-3 py-2 text-left text-md text-white transition-colors hover:bg-red-500/15 hover:text-red-100
                                 hover:cursor-pointer"
                         >
-                            <DeleteIcon classname="w-6 h-6"/>
+                            <DeleteIcon className="w-6 h-6"/>
                             <p>Delete</p>
                         </button>
                     </div>,

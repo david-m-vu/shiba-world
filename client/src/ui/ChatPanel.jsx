@@ -31,7 +31,7 @@ const formatMessageTime = (value) => {
     });
 };
 
-const ChatPanel = () => {
+const ChatPanel = ({ topOverlay = null }) => {
     const messages = useGameStore((state) => state.messages);
     const playersById = useGameStore((state) => state.playersById);
     const selfPlayerId = useGameStore((state) => state.selfPlayerId);
@@ -39,7 +39,7 @@ const ChatPanel = () => {
     const pushToast = useGameStore((state) => state.pushToast);
 
     const [draftMessage, setDraftMessage] = useState("");
-    const [isChatHidden, setIsChatHidden] = useState(true);
+    const [isChatHidden, setIsChatHidden] = useState(false);
     const [isSending, setIsSending] = useState(false);
 
     const messagesListRef = useRef(null);
@@ -191,8 +191,14 @@ const ChatPanel = () => {
     };
 
     return (
-        <div className="pointer-events-none absolute bottom-2 left-2 z-50">
-            <section className="pointer-events-auto flex w-[min(95vw,28rem)] flex-col overflow-hidden border border-white/15 bg-[rgba(25,25,25,0.2)]
+        <div className="pointer-events-none absolute bottom-2 left-2 z-50 flex w-[min(95vw,28rem)] flex-col gap-2">
+            {topOverlay ? (
+                <div className="pointer-events-auto flex justify-center">
+                    {topOverlay}
+                </div>
+            ) : null}
+
+            <section className="pointer-events-auto flex w-full flex-col overflow-hidden border border-white/15 bg-[rgba(25,25,25,0.2)]
                             text-white shadow-lg backdrop-blur-xs transition-colors focus-within:bg-[rgba(25,25,25,0.6)] hover:bg-[rgba(25,25,25,0.6)]">
                 <header className="flex flex-row justify-between border-b border-white/10 px-3 py-2 text-sm tracking-[0.18em] text-white/85">
                     <p>SHIBA_CHAT</p>

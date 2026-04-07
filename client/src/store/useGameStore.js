@@ -13,6 +13,8 @@ const MAX_ACTIVE_TOASTS = 5;
 const MAX_MESSAGES_PER_ROOM = 50;
 const WATCH_PLAYBACK_RATE_MIN = 0.25;
 const WATCH_PLAYBACK_RATE_MAX = 2;
+const WATCH_VOLUME_MIN = 0;
+const WATCH_VOLUME_MAX = 100;
 
 let nextToastId = 0;
 
@@ -66,7 +68,7 @@ const createDefaultWatchTogetherState = () => {
         playbackRate: 1,
         anchorTimeSec: 0, // authoritative video time in s at a known moment (ex: if someone seeks to 53.2, server sets anchorTimeSec = 53.2)
         anchorServerTsMs: Date.now(), // server's timestamp in ms for when the anchor was recorded. Clients use this with anchorTimeSec
-        version: 0, // monotonic state revision number - lets clients ignore stale/out-of-order watch:stack packets (higher versionw ins)
+        version: 0, // monotonic state revision number - lets clients ignore stale/out-of-order watch:stack packets (higher version wins)
         updatedBy: null,
         updatedAt: null,
     };
@@ -429,6 +431,8 @@ export const useGameStore = create(
             sunsetMode: true,
             voiceEnabled: false,
             soundEnabled: true,
+            watchVolume: 100,
+            watchMuted: false,
             videoScreenEnabled: true,
             shadowsEnabled: true,
             infiniteJumpEnabled: false,
@@ -510,6 +514,17 @@ export const useGameStore = create(
             },
             toggleSoundEnabled: () => {
                 set((state) => ({ soundEnabled: !state.soundEnabled }));
+            },
+            setWatchVolume: (volume) => {
+                const parsedVolume = Number(volume);
+                const safeVolume = Number.isFinite(parsedVolume)
+                    ? Math.max(WATCH_VOLUME_MIN, Math.min(WATCH_VOLUME_MAX, Math.round(parsedVolume)))
+                    : WATCH_VOLUME_MAX;
+
+                set({ watchVolume: safeVolume });
+            },
+            setWatchMuted: (watchMuted) => {
+                set({ watchMuted: Boolean(watchMuted) });
             },
             toggleVideoScreenEnabled: () => {
                 set((state) => ({ videoScreenEnabled: !state.videoScreenEnabled }));
@@ -1013,7 +1028,9 @@ export const useGameStore = create(
             storage: createJSONStorage(() => localStorage), // createJSONStorage is a zustand helper that handles JSON serialize/deserialize for persisted state - stringifies partial state obj before writing to local storage
             partialize: (state) => ({ // partial state to persist across refreshes. Persist middleware saves only this object to localStorage, not the full zustand state
                 sunsetMode: state.sunsetMode,
-                localPlayerName: state.localPlayerName
+                localPlayerName: state.localPlayerName,
+                watchVolume: state.watchVolume,
+                watchMuted: state.watchMuted,
             }),
         }
     )

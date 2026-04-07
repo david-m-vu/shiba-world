@@ -116,7 +116,7 @@ const FlyingScreen = ({
             player.setPlaybackRate?.(playbackRate);
         }
 
-        const allowedDrift = playbackStatus === "playing" ? 1.25 : 0.35;
+        const allowedDrift = playbackStatus === "playing" ? 0.5 : 0.1;
         if (Math.abs(currentPlayerTime - safeEffectiveTimeSec) > allowedDrift) {
             player.seekTo?.(safeEffectiveTimeSec, true);
         }
