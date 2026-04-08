@@ -405,6 +405,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
                             playerReadyRef.current = true;
                             applyLocalPlayerVolume();
                             syncPlayerToWatchState();
+                            // console.log(`onready sync player to watch state at ${Date.now()}`)
                         },
                         onStateChange: async (event) => {
                             // if we're currently suppressing events, dont send any emits to the server
@@ -537,7 +538,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
     // this effect syncs the client side to the server authoritative state with syncPlayerToWatchState whenever it updates
     // syncPlayerToWatchState() is set to update when the global zustand watchTogether state updates, which happens from the socket event listener
     useEffect(() => {
-        // console.log("syncing player to watch state")
+        // console.log(`sync player to watch state at ${Date.now()}`)
         syncPlayerToWatchState();
     }, [syncPlayerToWatchState]);
 

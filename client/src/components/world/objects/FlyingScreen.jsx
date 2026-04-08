@@ -167,6 +167,7 @@ const FlyingScreen = ({
                             event.target?.mute?.();
                             event.target?.setVolume?.(0);
                             syncScreenPlayerToWatchState();
+                            // console.log(`onready sync screen player to watch state at ${Date.now()}`)
                         },
                     },
                 });
@@ -196,6 +197,7 @@ const FlyingScreen = ({
 
     // sync player state every time zustand watchTogetherState changes
     useEffect(() => {
+        // console.log(`sync screen player to watch state at ${Date.now()}`)
         syncScreenPlayerToWatchState();
     }, [syncScreenPlayerToWatchState]);
 
@@ -208,6 +210,7 @@ const FlyingScreen = ({
                 return;
             }
 
+            // console.log(`tab return sync screen player to watch state at ${Date.now()}`)
             syncScreenPlayerToWatchState();
 
             if (delayedResyncTimeoutId) {

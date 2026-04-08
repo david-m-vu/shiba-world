@@ -247,7 +247,7 @@ const PlaybackControls = ({ outerClassName }) => {
                 : VolumeHighIcon;
 
     return (
-        <div className={`w-fit rounded-full flex flex-row items-center justify-center gap-4 px-4 py-1.25 bg-[rgba(25,25,25,0.7)] ${outerClassName}`}>
+        <div className={`w-fit rounded-full flex flex-row items-center justify-center gap-4 px-4 py-1.25 bg-[rgba(25,25,25,0.7)] backdrop-blur-sm ${outerClassName}`}>
             <div
                 className="flex relative items-center"
                 ref={rateControlRef}
@@ -266,7 +266,8 @@ const PlaybackControls = ({ outerClassName }) => {
                     title={`Playback rate: ${playbackRate}x`}
                     disabled={!hasQueuedVideos}
                     className={PLAYBACK_BUTTON_CLASS}
-                    onClick={() => {
+                    onClick={(e) => {
+                        e.currentTarget.blur();
                         if (hasQueuedVideos) {
                             setRatePopupToggled((prev) => {
                                 const next = !prev;
@@ -283,8 +284,8 @@ const PlaybackControls = ({ outerClassName }) => {
 
                 
                 <div className={`${((showRatePopup || ratePopupToggled) && hasQueuedVideos) ? "opacity-100" : "pointer-events-none opacity-0"} 
-                    flex flex-col items-center w-12 gap-2 absolute left-1/2 bottom-full -translate-x-1/2 rounded-full bg-[rgba(25,25,25,0.7)] px-2 py-3 shadow-lg backdrop-blur-sm
-                    transition-opacity`}
+                    flex flex-col items-center w-12 gap-2 absolute left-1/2 bottom-full -translate-x-1/2 rounded-full ${ratePopupToggled && hasQueuedVideos ? "bg-[rgba(25,25,25,0.7)]" : "bg-[rgba(25,25,25,0.4)]"}  
+                    x-2 py-3 shadow-lg backdrop-blur-sm transition-opacity`}
                 >
                     <div className="text-center text-xs text-white/85 tabular-nums">
                         {sliderRate.toFixed(2).replace(/\.00$/, "")}x
@@ -314,7 +315,8 @@ const PlaybackControls = ({ outerClassName }) => {
                     aria-label="Go to previous video"
                     disabled={!canGoToPrevious}
                     className={`${PLAYBACK_BUTTON_CLASS}`}
-                    onClick={() => {
+                    onClick={(e) => {
+                        e.currentTarget.blur();
                         void handleGoToPrevious();
                     }}
                 >
@@ -327,7 +329,8 @@ const PlaybackControls = ({ outerClassName }) => {
                         aria-label="Play video"
                         disabled={!hasQueuedVideos}
                         className={`${PLAYBACK_BUTTON_CLASS}`}
-                        onClick={() => {
+                        onClick={(e) => {
+                            e.currentTarget.blur();
                             void handlePlayPause();
                         }}
                     >
@@ -339,7 +342,8 @@ const PlaybackControls = ({ outerClassName }) => {
                         aria-label="Pause video"
                         disabled={!hasQueuedVideos}
                         className={`${PLAYBACK_BUTTON_CLASS}`}
-                        onClick={() => {
+                        onClick={(e) => {
+                            e.currentTarget.blur();
                             void handlePlayPause();
                         }}
                     >
@@ -352,7 +356,8 @@ const PlaybackControls = ({ outerClassName }) => {
                     aria-label="Go to next video"
                     disabled={!canGoToNext}
                     className={`${PLAYBACK_BUTTON_CLASS}`}
-                    onClick={() => {
+                    onClick={(e) => {
+                        e.currentTarget.blur();
                         void handleGoToNext();
                     }}
                 >
@@ -378,7 +383,9 @@ const PlaybackControls = ({ outerClassName }) => {
                     onPointerDown={(event) => { // only apply to mobile so they can click to toggle
                         volumePointerIsTouchRef.current = event.pointerType !== "mouse";
                     }}
-                    onClick={() => {
+                    onClick={(e) => {
+                        e.currentTarget.blur();
+                        
                         const isTouchInteraction = volumePointerIsTouchRef.current;
                         volumePointerIsTouchRef.current = false; // immediately consumes the onPointerDown set (onPointerDown runs before onClick if pointer action)
 
@@ -401,7 +408,7 @@ const PlaybackControls = ({ outerClassName }) => {
                 </button>
 
                 <div className={`${(showVolumePopup || volumePopupToggled) ? "opacity-100" : "pointer-events-none opacity-0"} 
-                    flex flex-col items-center w-12 gap-2 absolute left-1/2 bottom-full -translate-x-1/2 rounded-full bg-[rgba(25,25,25,0.7)] px-2 py-3 shadow-lg backdrop-blur-sm
+                    flex flex-col items-center w-12 gap-2 absolute left-1/2 bottom-full -translate-x-1/2 rounded-full ${volumePopupToggled ? "bg-[rgba(25,25,25,0.7)]" : "bg-[rgba(25,25,25,0.4)]"} px-2 py-3 shadow-lg backdrop-blur-sm
                     transition-opacity`}
                 >
                     <div className={`flex h-24 w-8 items-center justify-center transition-opacity ${watchMuted ? "opacity-40" : "opacity-100"}`}>
