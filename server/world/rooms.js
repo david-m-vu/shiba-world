@@ -264,6 +264,7 @@ export const addChatMessage = (socketId, text) => {
     player.updatedAt = messageObj.createdAt;
     appendRoomMessage(room, messageObj);
 
+    // TODO: do we really need to return player here?
     return {
         roomId,
         message: messageObj,

@@ -7,6 +7,9 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { createGameSocket, emitWithAck } from "../lib/socketClient.js";
 import { toSafeVector3, toSafeVector4 } from "../lib/util.js";
+import chatBarkClassicSoundUrl from "../assets/sounds/chat-bark-classic.wav";
+import chatBarkCuteSoundUrl from "../assets/sounds/chat-bark-cute.wav";
+import chatBarkSoundUrl from "../assets/sounds/chat-bark.wav";
 
 const DEFAULT_TOAST_DURATION_MS = 5000;
 const MAX_ACTIVE_TOASTS = 5;
@@ -17,11 +20,55 @@ const WATCH_VOLUME_MIN = 0;
 const WATCH_VOLUME_MAX = 100;
 
 let nextToastId = 0;
+const chatNotificationAudioByUrl = new Map();
+const CHAT_NOTIFICATION_SOUND_URLS = [
+    chatBarkClassicSoundUrl,
+    chatBarkCuteSoundUrl,
+    chatBarkSoundUrl,
+];
 
 const createToastId = () => {
     nextToastId++;
     return `toast-${nextToastId}`;
 };
+
+const playChatNotificationSound = () => {
+    // safe way to check whether the code is running in a browser like environment - to avoid playing audio in non-browser environments
+    if (typeof window === "undefined") {
+        return;
+    }
+
+    try {
+        const randomSoundUrl = CHAT_NOTIFICATION_SOUND_URLS[
+            Math.floor(Math.random() * CHAT_NOTIFICATION_SOUND_URLS.length)
+        ];
+
+        let chatNotificationAudio = chatNotificationAudioByUrl.get(randomSoundUrl);
+        if (!chatNotificationAudio) {
+            chatNotificationAudio = new Audio(randomSoundUrl);
+            chatNotificationAudio.preload = "auto"; // indicates that the whole media file can be downloaded, even if the user is not expected to use it - helps sound start faster
+            chatNotificationAudio.volume = 0.75;
+            chatNotificationAudioByUrl.set(randomSoundUrl, chatNotificationAudio);
+        }
+
+        chatNotificationAudio.currentTime = 0; // reset playback position back to the start every time we play sound - each new message triggers a full fresh sound
+        chatNotificationAudio.playbackRate = 0.75 + Math.random() * 0.5; 
+
+
+        const playPromise = chatNotificationAudio.play(); // play returns a promise which is resolved when playback has been successfully started
+        
+        // playback might reject because browser autoplay restrictions, no user interaction yet, or theres an audio loading / playback problem
+        if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(() => { // catch is the promise method that runs if the Promise is rejected - so app doesn't throw an unhandled promise error
+                // browser autoplay restrictions can reject playback until the page has user interaction
+            })
+        }
+
+
+    } catch {
+        // no-op
+    }
+}
 
 const buildRoomShareLink = (roomId) => {
     const safeRoomId = String(roomId ?? "").trim();
@@ -393,11 +440,25 @@ const bindSocketListeners = (set, get, socket) => {
             return;
         }
 
+        let shouldPlayNotification = false;
+
         set((state) => {
+            const nextMessages = appendMessage(state.messages, message);
+            // TODO: have a different sound effect for system messages
+            shouldPlayNotification = nextMessages !== state.messages && state.soundEnabled && message.type === "chat"; 
+
+            if (nextMessages === state.messages) {
+                return state;
+            }
+            
             return {
-                messages: appendMessage(state.messages, message)
+                messages: nextMessages
             }
         })
+
+        if (shouldPlayNotification) {
+            playChatNotificationSound();
+        }
     })
 
     socket.on("watch:state", (payload = {}) => {
