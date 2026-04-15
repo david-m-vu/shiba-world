@@ -15,7 +15,8 @@ import {
     WATCH_PLAYBACK_RATE_MIN,
     WATCH_PLAYBACK_RATE_MAX,
     WATCH_AUTOPLAY_LEAD_MS, 
-    MAX_WATCH_QUEUE_ITEMS
+    MAX_WATCH_QUEUE_ITEMS,
+    MAX_PLAYERS_PER_ROOM
 } from "../constants/roomConstants.js";
 import { normalizeVector3, normalizeQuaternion, toFiniteNumber, clampNumber } from "../util/index.js";
 
@@ -438,5 +439,6 @@ export const serializeRoom = (room) => {
         objects: Array.from(room.objects.values()), // room.objects is a map of physical object ids to physical object objects. Taking just the values from the map is OK since we can reconvert to map easily with object.id
         messages: [...room.messages], // copy with spread operator - messages is an array of message objects. Earlier elements are the oldest messages
         watchTogether: cloneWatchTogetherState(room.watchTogether),
+        maxPlayers: room.maxPlayers ?? MAX_PLAYERS_PER_ROOM
     };
 };

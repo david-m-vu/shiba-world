@@ -1,3 +1,4 @@
+export const MAX_PLAYERS_PER_ROOM = 8;
 export const MAX_MESSAGES_PER_ROOM = 50;
 export const OBJECT_ID_MAX_LENGTH = 64;
 

@@ -14,10 +14,12 @@ export const setRoomStore = (nextRoomStore) => {
 
     const requiredMethods = [
         "roomExists",
+        "getRoomPublicStatus",
         "getRoomSnapshot",
         "createRoom",
         "joinRoom",
         "leaveRoom",
+        "moveSocketToRoom",
         "updatePlayerState",
         "updateWorldObjectState",
         "addChatMessage",

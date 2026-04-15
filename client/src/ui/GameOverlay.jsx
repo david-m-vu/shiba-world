@@ -9,7 +9,7 @@ import WatchTogetherInterface from "./WatchTogetherInterface.jsx";
 import PlaybackControls from "./PlaybackControls.jsx";
 
 // ?react is a vite query suffix that tells the svg plug (vite-plugin0svgr) to transform the svg into a React component
-import HelpIcon from "../assets/icons/help_outline.svg?react"; 
+import HelpIcon from "../assets/icons/help_outline.svg?react";
 import SunsetIcon from "../assets/icons/sunset-icon.webp";
 import SoundOnIcon from  "../assets/icons/sound_on.svg?react";
 
@@ -18,6 +18,7 @@ import SoundOffIcon from "../assets/icons/sound_off.svg?react";
 
 import CopyIcon from "../assets/icons/content_copy.svg?react";
 
+import PlayerListIcon from "../assets/icons/groups.svg?react";
 import SettingsIcon from "../assets/icons/settings.svg?react";
 import ToggleButton from "../components/ui/ToggleButton.jsx";
 
@@ -80,12 +81,13 @@ const getIsFirstVisit = () => {
     }
 };
 
-const EMPTY_WATCH_QUEUE = Object.freeze([]); 
+const EMPTY_WATCH_QUEUE = Object.freeze([]);
 
 const GameOverlay = () => {
     const [isFirstVisit] = useState(() => getIsFirstVisit());
     const [isHelpEnabled, setIsHelpEnabled] = useState(isFirstVisit);
     const [isSettingsEnabled, setIsSettingsEnabled] = useState(false);
+    const [isPlayerListEnabled, setIsPlayerListEnabled] = useState(false);
 
     const statsParentRef = useRef(null);
     const navigate = useNavigate();
@@ -93,7 +95,7 @@ const GameOverlay = () => {
     const currentRoomId = useGameStore((state) => state.currentRoomId)
     const watchTogetherQueue = useGameStore((state) => state.watchTogether.queue)
     const watchTogetherOpen = useGameStore((state) => state.watchTogetherOpen);
- 
+
     const cameraLockMode = useGameStore((state) => state.cameraLockMode);
     const sunsetMode = useGameStore((state) => state.sunsetMode);
     // const voiceEnabled = useGameStore((state) => state.voiceEnabled);
@@ -171,9 +173,9 @@ const GameOverlay = () => {
                 throw new Error("Copy command was rejected.");
             }
 
-            pushToast("Room code copied.", { 
+            pushToast("Room code copied.", {
                 type: "success",
-                durationMs: 2000 
+                durationMs: 2000
             });
         } catch {
             pushToast("Failed to copy room code.");
@@ -276,11 +278,11 @@ const GameOverlay = () => {
                                 <SoundOffIcon className="w-8 sm:w-10 h-auto text-white" />
                             )}
                         </button> */}
-        
+
                         {/* Help dropdown */}
                         <div
                             aria-hidden={!isHelpEnabled}
-                            className={`flex flex-col absolute px-5 py-4 left-0 gap-1 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all duration-200 ease-out 
+                            className={`flex flex-col absolute px-5 py-4 left-0 gap-1 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all duration-200 ease-out
                                 ${isHelpEnabled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"}`}
                         >
                             <h1 className="text-[1rem] text-center">Controls</h1>
@@ -350,8 +352,21 @@ const GameOverlay = () => {
                         <CopyIcon className="w-4 sm:w-5 h-auto text-white" />
                     </button>
 
-                    {/* Settings */}
-                    <div className="pointer-events-auto inline-flex bg-[rgba(85,85,85,0.8)] rounded-full relative px-2.5">
+                    {/* Player List and Settings */}
+                    <div className="pointer-events-auto inline-flex flex-row gap-2.5 px-3.5 py-2.5 bg-[rgba(85,85,85,0.8)] rounded-4xl relative">
+                        <button
+                            type="button"
+                            aria-label="Toggle player list"
+                            aria-pressed={isPlayerListEnabled}
+                            onClick={(e) => {
+                                setIsPlayerListEnabled((prev) => !prev);
+                                e.currentTarget.blur();
+                            }}
+                            className={TOGGLE_BUTTON_CLASS}
+                        >
+                            <PlayerListIcon className={`w-8 sm:w-10 h-auto ${isPlayerListEnabled ? "text-primary" : "text-white"}`} />
+                        </button>
+
                         <button
                             type="button"
                             aria-label="Toggle settings"
@@ -368,7 +383,7 @@ const GameOverlay = () => {
                         {/* Settings dropdown */}
                         <div
                             aria-hidden={!isSettingsEnabled}
-                            className={`text-sm sm:text-[1rem] flex flex-col absolute p-5 right-0 gap-4 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all 
+                            className={`text-sm sm:text-[1rem] flex flex-col absolute p-5 right-0 gap-4 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all
                                 duration-200 ease-out ${isSettingsEnabled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"}`}
                         >
                             {/* room code on small screens */}
@@ -377,7 +392,7 @@ const GameOverlay = () => {
                                 aria-label="Copy room id"
                                 onClick={handleCopyRoomIdClick}
                                 disabled={!currentRoomId}
-                                className="xs2:hidden flex flex-row items-center self-center gap-2.5 
+                                className="xs2:hidden flex flex-row items-center self-center gap-2.5
                                     hover:cursor-pointer whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60"
                             >
                                 <p>Room Code: <span className="text-primary">{currentRoomId}</span></p>
@@ -439,7 +454,7 @@ const GameOverlay = () => {
                                     <ToggleButton
                                         ariaLabel="Toggle shadows"
                                         enabled={shadowsEnabled}
-                                        onToggle={(e) => { 
+                                        onToggle={(e) => {
                                             toggleShadowsEnabled();
                                             e.currentTarget.blur();
                                         }}
@@ -468,7 +483,7 @@ const GameOverlay = () => {
                                     />
                                 </div>
                             </div>
-                            
+
                             <hr />
 
                             {/* Buttons */}
@@ -496,7 +511,7 @@ const GameOverlay = () => {
                 { cameraLockMode && <Crosshair /> }
             </div>
 
-            
+
             <ChatPanel
                 topOverlay={
                     !watchTogetherOpen && hasQueuedVideos ? (
@@ -504,7 +519,7 @@ const GameOverlay = () => {
                     ) : null
                 }
             />
-            
+
             <WatchTogetherInterface isOpen={watchTogetherOpen} />
 
             {!watchTogetherOpen && hasQueuedVideos &&

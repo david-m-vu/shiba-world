@@ -61,7 +61,7 @@ const Landing = () => {
             setErrorMessage("");
             setPendingAction("verifying");
             try {
-                const response = await fetch(`${SERVER_BASE_URL}/api/rooms/${safeRoomCode}/exists`);
+                const response = await fetch(`${SERVER_BASE_URL}/api/rooms/${safeRoomCode}/status`);
                 const responseJson = await response.json();
 
                 if (!responseJson.ok) {
@@ -75,7 +75,7 @@ const Landing = () => {
                 }
 
             } catch (error) {
-                setErrorMessage(error instanceof Error ? error.message : "failed to check room existence.");
+                setErrorMessage(error instanceof Error ? error.message : "failed to check room status.");
                 return;
 
             } finally {

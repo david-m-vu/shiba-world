@@ -11,6 +11,7 @@ import {
     serializeRoom,
     applyWatchCommandToRoom
 } from "./roomStateHelpers.js";
+import { MAX_PLAYERS_PER_ROOM } from "../constants/roomConstants.js";
 
 const rooms = new Map(); // map roomIds to room objects - to get what players are in each room + additional metadata
 const socketToRoomId = new Map(); // map socketIds to RoomIds - to get what rooms each socket belongs to
@@ -37,6 +38,28 @@ export const roomExists = (roomId) => {
     return rooms.has(safeRoomId);
 }
 
+export const getRoomPublicStatus = (roomId) => {
+    const safeRoomId = String(roomId ?? "").trim();
+    if (!safeRoomId) {
+        return null;
+    }
+
+    const room = rooms.get(safeRoomId) ?? null;
+    if (!room) {
+        return null;
+    }
+
+    const maxPlayers = room.maxPlayers ?? MAX_PLAYERS_PER_ROOM;
+    const playerCount = room.players.size;
+
+    return {
+        roomId: room.id,
+        playerCount,
+        maxPlayers,
+        isFull: playerCount >= maxPlayers,
+    };
+};
+
 /**
  * Creates a new room with a generated invite code and registers the given, creating
  * socket as both the room host and the first player.
@@ -62,6 +85,7 @@ export const createRoom = ({ socketId, playerName, worldType = "default" }) => {
         objects: new Map(), // gets populated only when a client emits object:update
         messages: [], // chat history across allplayers
         watchTogether: createWatchTogetherState(),
+        maxPlayers: MAX_PLAYERS_PER_ROOM
     };
 
     const createdPlayer = createPlayer({ id: socketId, name: playerName });
@@ -96,6 +120,12 @@ export const joinRoom = ({ roomId, socketId, playerName }) => {
         };
     }
 
+    // if room to join is full, send error message to client
+    const maxPlayers = room.maxPlayers ?? MAX_PLAYERS_PER_ROOM
+    if (room.players.size >= maxPlayers) {
+        throw new Error(`Room is full. Maximum ${maxPlayers} players allowed.`);
+    }
+
     const player = createPlayer({ id: socketId, name: playerName });
     room.players.set(socketId, player);
     socketToRoomId.set(socketId, roomId);
@@ -112,7 +142,7 @@ export const joinRoom = ({ roomId, socketId, playerName }) => {
     };
 };
 
-export const leaveRoom = (socketId) => {
+const removeSocketFromCurrentRoom = (socketId) => {
     const roomId = getRoomIdForSocket(socketId);
     if (!roomId) { // if no room id, that means this socket isn't attached to any room
         return null;
@@ -172,6 +202,51 @@ export const leaveRoom = (socketId) => {
         removedPlayerId: socketId,
         nextHostSocketId: room.hostSocketId,
         systemMessage: leaveSystemMessage,
+    };
+};
+
+export const leaveRoom = (socketId) => {
+    return removeSocketFromCurrentRoom(socketId);
+};
+
+// similar to joinRoom, but also leaves the current room if the socket is in one before joining the given, new one
+export const moveSocketToRoom = ({ roomId, socketId, playerName }) => {
+    const targetRoom = rooms.get(roomId) ?? null;
+    if (!targetRoom) {
+        throw new Error("Room not found.");
+    }
+
+    if (targetRoom.players.has(socketId)) {
+        const existingPlayer = targetRoom.players.get(socketId);
+        return {
+            departureObj: null,
+            player: existingPlayer,
+            room: serializeRoom(targetRoom),
+            isNewPlayer: false,
+        };
+    }
+
+    const maxPlayers = targetRoom.maxPlayers ?? MAX_PLAYERS_PER_ROOM;
+    if (targetRoom.players.size >= maxPlayers) {
+        throw new Error(`Room is full. Maximum ${maxPlayers} players allowed.`);
+    }
+
+    const departureObj = removeSocketFromCurrentRoom(socketId);
+
+    const player = createPlayer({ id: socketId, name: playerName });
+    targetRoom.players.set(socketId, player);
+    socketToRoomId.set(socketId, roomId);
+    const joinSystemMessage = appendRoomMessage(
+        targetRoom,
+        createSystemChatMessage(`${player.name} has joined.`, { systemType: "join" })
+    );
+
+    return {
+        departureObj,
+        player,
+        systemMessage: joinSystemMessage,
+        room: serializeRoom(targetRoom),
+        isNewPlayer: true,
     };
 };
 

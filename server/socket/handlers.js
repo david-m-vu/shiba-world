@@ -52,6 +52,8 @@ export const registerSocketHandlers = (io, socket) => {
     // payload is an object of { playerName, worldType }
     socket.on("room:create", async (payload = {}, callback) => {
         try {
+            // NOTE: this leaving and joining flow doesn't have the same concurrency issue as room:join where two players try joining a 7/8 room at the same time
+            // and one leaves before being able to join because room creation simply doesn't care about this.
             // if the socket is already in some old room, remove it from that old room first, and notify that old room that the player left
             const departureObj = await roomStore.leaveRoom(socket.id);
             emitDeparture(io, socket, departureObj);
@@ -91,16 +93,13 @@ export const registerSocketHandlers = (io, socket) => {
                 throw new Error("Room ID is required.");
             }
 
-            // leave the room they were in before if they were in one
-            const departureObj = await roomStore.leaveRoom(socket.id);
-            emitDeparture(io, socket, departureObj);
-
-            const joinedRoomObj = await roomStore.joinRoom({
+            const joinedRoomObj = await roomStore.moveSocketToRoom({
                 roomId: targetRoomId,
                 socketId: socket.id,
                 playerName: payload.playerName,
             });
 
+            emitDeparture(io, socket, joinedRoomObj.departureObj);
             socket.join(joinedRoomObj.room.id);
 
             const response = {
