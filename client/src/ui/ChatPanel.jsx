@@ -150,6 +150,7 @@ const ChatPanel = ({ topOverlay = null }) => {
             return;
         }
 
+        inputRef.current?.blur();
         setIsChatHidden(false);
 
         setIsSending(true);

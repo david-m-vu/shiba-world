@@ -9,7 +9,7 @@ import { createGameSocket, emitWithAck } from "../lib/socketClient.js";
 import { toSafeVector3, toSafeVector4 } from "../lib/util.js";
 import {
     playChatSound,
-    playJumpSound,
+    playJumpSound as playJumpSoundEffect,
     playSystemJoinSound,
     playSystemLeaveSound,
     playSystemCreateSound
@@ -22,6 +22,8 @@ const WATCH_PLAYBACK_RATE_MIN = 0.25;
 const WATCH_PLAYBACK_RATE_MAX = 2;
 const WATCH_VOLUME_MIN = 0;
 const WATCH_VOLUME_MAX = 100;
+const SOUND_EFFECTS_VOLUME_MIN = 0;
+const SOUND_EFFECTS_VOLUME_MAX = 100;
 
 let nextToastId = 0;
 
@@ -68,6 +70,19 @@ const buildRoomShareLink = (roomId) => {
     }
 
     return `${window.location.origin}${roomPath}`;
+};
+
+const normalizeSoundEffectsVolume = (volume) => {
+    const parsedVolume = Number(volume);
+    if (!Number.isFinite(parsedVolume)) {
+        return SOUND_EFFECTS_VOLUME_MAX;
+    }
+
+    return Math.max(SOUND_EFFECTS_VOLUME_MIN, Math.min(SOUND_EFFECTS_VOLUME_MAX, Math.round(parsedVolume)));
+};
+
+const toSoundEffectsMasterVolume = (volume) => {
+    return normalizeSoundEffectsVolume(volume) / SOUND_EFFECTS_VOLUME_MAX;
 };
 
 const normalizePlayer = (player = {}) => {
@@ -433,10 +448,12 @@ const bindSocketListeners = (set, get, socket) => {
         }
 
         let soundToPlay = null;
+        let soundMasterVolume = 0;
 
         set((state) => {
             const nextMessages = appendMessage(state.messages, message);
-            if (nextMessages !== state.messages && state.soundEnabled) {
+            if (nextMessages !== state.messages && state.soundEffectsVolume > SOUND_EFFECTS_VOLUME_MIN) {
+                soundMasterVolume = toSoundEffectsMasterVolume(state.soundEffectsVolume);
                 if (message.type === "chat") {
                     soundToPlay = "chat";
                 } else {
@@ -454,11 +471,11 @@ const bindSocketListeners = (set, get, socket) => {
         })
 
         if (soundToPlay === "chat") {
-            playChatSound();
+            playChatSound(soundMasterVolume);
         } else if (soundToPlay === "join") {
-            playSystemJoinSound();
+            playSystemJoinSound(soundMasterVolume);
         } else if (soundToPlay === "leave") {
-            playSystemLeaveSound();
+            playSystemLeaveSound(soundMasterVolume);
         } 
     })
 
@@ -492,7 +509,7 @@ export const useGameStore = create(
             cameraLockMode: false,
             sunsetMode: true,
             voiceEnabled: false,
-            soundEnabled: true,
+            soundEffectsVolume: 100,
             watchVolume: 100,
             watchMuted: false,
             videoScreenEnabled: true,
@@ -574,15 +591,16 @@ export const useGameStore = create(
             toggleVoiceEnabled: () => {
                 set((state) => ({ voiceEnabled: !state.voiceEnabled }));
             },
-            toggleSoundEnabled: () => {
-                set((state) => ({ soundEnabled: !state.soundEnabled }));
+            setSoundEffectsVolume: (volume) => {
+                set({ soundEffectsVolume: normalizeSoundEffectsVolume(volume) });
             },
             playJumpSound: () => {
-                if (!get().soundEnabled) {
+                const soundMasterVolume = toSoundEffectsMasterVolume(get().soundEffectsVolume);
+                if (soundMasterVolume <= 0) {
                     return;
                 }
 
-                playJumpSound();
+                playJumpSoundEffect(soundMasterVolume);
             },
 
             setWatchVolume: (volume) => {
@@ -867,8 +885,9 @@ export const useGameStore = create(
                         highlightText: shareableLink,
                     });
 
-                    if (get().soundEnabled) {
-                        playSystemCreateSound();
+                    const soundMasterVolume = toSoundEffectsMasterVolume(get().soundEffectsVolume);
+                    if (soundMasterVolume > 0) {
+                        playSystemCreateSound(soundMasterVolume);
                     }
 
                     return {
@@ -1103,6 +1122,7 @@ export const useGameStore = create(
             partialize: (state) => ({ // partial state to persist across refreshes. Persist middleware saves only this object to localStorage, not the full zustand state
                 sunsetMode: state.sunsetMode,
                 localPlayerName: state.localPlayerName,
+                soundEffectsVolume: state.soundEffectsVolume,
                 watchVolume: state.watchVolume,
                 watchMuted: state.watchMuted,
             }),

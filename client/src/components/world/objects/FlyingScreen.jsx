@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Html } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
+import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import { useGameStore } from "../../../store/useGameStore.js";
 import { getYoutubeIframeApi } from "../../../lib/youtubeIframeApi.js";
 import { getEffectiveWatchTimeSec } from "../../../lib/watchTogetherHelpers.js";
@@ -12,7 +13,7 @@ const FlyingScreen = ({
     position = [0, 0, 0],
     rotation = [0, 0, 0],
     scale = 1,
-    screenSize = [20, 11.25, 0.2],
+    screenSize = [30, 16.875, 0.2],
     screenInset = 0.1,
     frameColor = "#141922",
     screenColor = "black",
@@ -22,7 +23,7 @@ const FlyingScreen = ({
     supportColor = "#2b3444",
     rotorLift = 0,
     rotorBladeCount = 3,
-    rotorBladeLength = 3,
+    rotorBladeLength = 4,
     rotorBladeWidth = 0.26,
     rotorBladeThickness = 0.09,
     rotorColor = "#1f2835",
@@ -55,9 +56,16 @@ const FlyingScreen = ({
         screenSize[1] + frameThickness * 2,
         screenSize[2] + frameThickness,
     ];
+    const scaleVec = Array.isArray(scale) ? scale : [scale, scale, scale];
+    const frontPanelSize = [screenSize[0], screenSize[1], 0.08];
+    const frontPanelPosition = [0, 0, (frameSize[2] / 2) + 0.01];
+    const backPanelSize = [screenSize[0] * 0.96, screenSize[1] * 0.96, 0.1];
+    const backPanelPosition = [0, 0, -(frameSize[2] / 2) - 0.05];
+    const supportColliderSize = [supportRadius * 2, supportHeight, supportRadius * 2];
 
     const screenTopY = frameSize[1] / 2;
     const supportXOffset = (frameSize[0] / 2) - frameThickness * 2;
+    const supportPoleY = screenTopY + supportHeight / 2;
     const rotorY = screenTopY + supportHeight + rotorLift;
     
     // convert iframe pixel size into world units for Html transform
@@ -289,106 +297,164 @@ const FlyingScreen = ({
     ));
 
     return (
-        <group
+        <RigidBody
+            type="fixed"
+            colliders={false}
             position={position}
             rotation={rotation}
-            scale={scale}
-            {...groupProps}
         >
-            {/* outer frame */}
-            <mesh castShadow receiveShadow>
-                <boxGeometry args={frameSize} />
-                <meshStandardMaterial color={frameColor} roughness={0.42} metalness={0.3} />
-            </mesh>
+            <CuboidCollider
+                args={[
+                    (frameSize[0] * scaleVec[0]) / 2,
+                    (frameSize[1] * scaleVec[1]) / 2,
+                    (frameSize[2] * scaleVec[2]) / 2,
+                ]}
+            />
+            <CuboidCollider
+                args={[
+                    (frontPanelSize[0] * scaleVec[0]) / 2,
+                    (frontPanelSize[1] * scaleVec[1]) / 2,
+                    (frontPanelSize[2] * scaleVec[2]) / 2,
+                ]}
+                position={[
+                    frontPanelPosition[0] * scaleVec[0],
+                    frontPanelPosition[1] * scaleVec[1],
+                    frontPanelPosition[2] * scaleVec[2],
+                ]}
+            />
+            <CuboidCollider
+                args={[
+                    (backPanelSize[0] * scaleVec[0]) / 2,
+                    (backPanelSize[1] * scaleVec[1]) / 2,
+                    (backPanelSize[2] * scaleVec[2]) / 2,
+                ]}
+                position={[
+                    backPanelPosition[0] * scaleVec[0],
+                    backPanelPosition[1] * scaleVec[1],
+                    backPanelPosition[2] * scaleVec[2],
+                ]}
+            />
+            <CuboidCollider
+                args={[
+                    (supportColliderSize[0] * scaleVec[0]) / 2,
+                    (supportColliderSize[1] * scaleVec[1]) / 2,
+                    (supportColliderSize[2] * scaleVec[2]) / 2,
+                ]}
+                position={[
+                    -supportXOffset * scaleVec[0],
+                    supportPoleY * scaleVec[1],
+                    0,
+                ]}
+            />
+            <CuboidCollider
+                args={[
+                    (supportColliderSize[0] * scaleVec[0]) / 2,
+                    (supportColliderSize[1] * scaleVec[1]) / 2,
+                    (supportColliderSize[2] * scaleVec[2]) / 2,
+                ]}
+                position={[
+                    supportXOffset * scaleVec[0],
+                    supportPoleY * scaleVec[1],
+                    0,
+                ]}
+            />
 
-            {/* front screen panel */}
-            <mesh position={[0, 0, (frameSize[2] / 2) + 0.01]} castShadow receiveShadow>
-                <boxGeometry args={[screenSize[0], screenSize[1], 0.08]} />
-                <meshStandardMaterial
-                    color={screenColor}
-                    emissive={screenColor}
-                    emissiveIntensity={0.08}
-                    roughness={0.2}
-                    metalness={0.08}
-                />
-            </mesh>
-            
-            {isInRoom && 
-                <Html
-                    transform // projects it onto 3d space
-                    position={[0, 0, (frameSize[2] / 2) + 0.06]}
-                    scale={htmlScreenScale}
-                    style={{
-                        pointerEvents: "none",
-                        userSelect: "none",
-                        WebkitUserSelect: "none",
-                    }}
-                    zIndexRange={[10, 0]}
-                    occlude="blending"
-                >
-                    <div
+            <group scale={scale} {...groupProps}>
+                {/* outer frame */}
+                <mesh castShadow receiveShadow>
+                    <boxGeometry args={frameSize} />
+                    <meshStandardMaterial color={frameColor} roughness={0.42} metalness={0.3} />
+                </mesh>
+
+                {/* front screen panel */}
+                <mesh position={frontPanelPosition} castShadow receiveShadow>
+                    <boxGeometry args={frontPanelSize} />
+                    <meshStandardMaterial
+                        color={screenColor}
+                        emissive={screenColor}
+                        emissiveIntensity={0.08}
+                        roughness={0.2}
+                        metalness={0.08}
+                    />
+                </mesh>
+                
+                {isInRoom && 
+                    <Html
+                        transform // projects it onto 3d space
+                        position={[0, 0, (frameSize[2] / 2) + 0.07]}
+                        scale={htmlScreenScale}
                         style={{
-                            width: `${SCREEN_PLAYER_WIDTH_PX}px`,
-                            height: `${SCREEN_PLAYER_HEIGHT_PX}px`,
-                            overflow: "hidden",
-                            backgroundColor: "black",
                             pointerEvents: "none",
+                            userSelect: "none",
+                            WebkitUserSelect: "none",
                         }}
+                        zIndexRange={[10, 0]}
+                        occlude="blending"
                     >
                         <div
-                            ref={screenPlayerHostRef}
                             style={{
-                                width: "100%",
-                                height: "100%",
+                                width: `${SCREEN_PLAYER_WIDTH_PX}px`,
+                                height: `${SCREEN_PLAYER_HEIGHT_PX}px`,
+                                overflow: "hidden",
+                                backgroundColor: "black",
                                 pointerEvents: "none",
                             }}
-                        />
-                    </div>
-                </Html>
-            }
+                        >
+                            <div
+                                ref={screenPlayerHostRef}
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    pointerEvents: "none",
+                                }}
+                            />
+                        </div>
+                    </Html>
+                }
 
-            {/* back panel */}
-            <mesh position={[0, 0, -(frameSize[2] / 2) - 0.05]} castShadow receiveShadow>
-                <boxGeometry args={[screenSize[0] * 0.96, screenSize[1] * 0.96, 0.1]} />
-                <meshStandardMaterial color={backColor} roughness={0.55} metalness={0.18} />
-            </mesh>
-
-            {/* support poles */}
-            <mesh
-                position={[-supportXOffset, screenTopY + supportHeight / 2, 0]}
-                castShadow
-                receiveShadow
-            >
-                <cylinderGeometry args={[supportRadius, supportRadius, supportHeight, 16]} />
-                <meshStandardMaterial color={supportColor} roughness={0.45} metalness={0.45} />
-            </mesh>
-            <mesh
-                position={[supportXOffset, screenTopY + supportHeight / 2, 0]}
-                castShadow
-                receiveShadow
-            >
-                <cylinderGeometry args={[supportRadius, supportRadius, supportHeight, 16]} />
-                <meshStandardMaterial color={supportColor} roughness={0.45} metalness={0.45} />
-            </mesh>
-
-            {/* left rotor */}
-            <group ref={leftRotorRef} position={[-supportXOffset, rotorY, 0]}>
-                <mesh castShadow receiveShadow>
-                    <cylinderGeometry args={[0.24, 0.24, 0.22, 18]} />
-                    <meshStandardMaterial color={rotorHubColor} roughness={0.35} metalness={0.55} />
+                {/* back panel */}
+                <mesh position={backPanelPosition} castShadow receiveShadow>
+                    <boxGeometry args={backPanelSize} />
+                    <meshStandardMaterial color={backColor} roughness={0.55} metalness={0.18} />
                 </mesh>
-                {rotorGeometries}
-            </group>
 
-            {/* right rotor */}
-            <group ref={rightRotorRef} position={[supportXOffset, rotorY, 0]}>
-                <mesh castShadow receiveShadow>
-                    <cylinderGeometry args={[0.24, 0.24, 0.22, 18]} />
-                    <meshStandardMaterial color={rotorHubColor} roughness={0.35} metalness={0.55} />
+                {/* support poles */}
+                <mesh
+                    position={[-supportXOffset, supportPoleY, 0]}
+                    castShadow
+                    receiveShadow
+                >
+                    <cylinderGeometry args={[supportRadius, supportRadius, supportHeight, 16]} />
+                    <meshStandardMaterial color={supportColor} roughness={0.45} metalness={0.45} />
                 </mesh>
-                {rotorGeometries}
+                <mesh
+                    position={[supportXOffset, supportPoleY, 0]}
+                    castShadow
+                    receiveShadow
+                >
+                    <cylinderGeometry args={[supportRadius, supportRadius, supportHeight, 16]} />
+                    <meshStandardMaterial color={supportColor} roughness={0.45} metalness={0.45} />
+                </mesh>
+
+                {/* left rotor */}
+                <group ref={leftRotorRef} position={[-supportXOffset, rotorY, 0]}>
+                    <mesh castShadow receiveShadow>
+                        <cylinderGeometry args={[0.24, 0.24, 0.22, 18]} />
+                        <meshStandardMaterial color={rotorHubColor} roughness={0.35} metalness={0.55} />
+                    </mesh>
+                    {rotorGeometries}
+                </group>
+
+                {/* right rotor */}
+                <group ref={rightRotorRef} position={[supportXOffset, rotorY, 0]}>
+                    <mesh castShadow receiveShadow>
+                        <cylinderGeometry args={[0.24, 0.24, 0.22, 18]} />
+                        <meshStandardMaterial color={rotorHubColor} roughness={0.35} metalness={0.55} />
+                    </mesh>
+                    {rotorGeometries}
+                </group>
             </group>
-        </group>
+        </RigidBody>
     );
 };
 

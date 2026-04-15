@@ -18,6 +18,21 @@ let systemJoinAudio = null;
 let systemLeaveAudio = null;
 let systemCreateAudio = null;
 
+const toSafeMasterVolume = (masterVolume = 1) => {
+    const parsedVolume = Number(masterVolume);
+    if (!Number.isFinite(parsedVolume)) {
+        return 1;
+    }
+
+    return Math.max(0, Math.min(1, parsedVolume));
+};
+
+const applyAudioVolume = (audio, { baseVolume, masterVolume }) => {
+    const safeBaseVolume = Math.max(0, Math.min(1, Number(baseVolume) || 0));
+    const safeMasterVolume = toSafeMasterVolume(masterVolume);
+    audio.volume = safeBaseVolume * safeMasterVolume;
+};
+
 const playAudio = (audio) => {
     audio.currentTime = 0;
 
@@ -29,7 +44,7 @@ const playAudio = (audio) => {
     }
 };
 
-export const playChatSound = () => {
+export const playChatSound = (masterVolume = 1) => {
     // safe way to check whether the code is running in a browser like environment - to avoid playing audio in non-browser environments
     if (typeof window === "undefined") {
         return;
@@ -44,10 +59,13 @@ export const playChatSound = () => {
         if (!chatNotificationAudio) {
             chatNotificationAudio = new Audio(randomSoundUrl);
             chatNotificationAudio.preload = "auto"; // indicates that the whole media file can be downloaded, even if the user is not expected to use it - helps sound start faster
-            chatNotificationAudio.volume = 0.75;
             chatNotificationAudioByUrl.set(randomSoundUrl, chatNotificationAudio);
         }
 
+        applyAudioVolume(chatNotificationAudio, {
+            baseVolume: 0.75,
+            masterVolume,
+        });
         chatNotificationAudio.playbackRate = 0.75 + Math.random() * 0.5; 
         playAudio(chatNotificationAudio);
     } catch {
@@ -55,7 +73,7 @@ export const playChatSound = () => {
     }
 };
 
-export const playJumpSound = () => {
+export const playJumpSound = (masterVolume = 1) => {
     if (typeof window === "undefined") {
         return;
     }
@@ -64,9 +82,12 @@ export const playJumpSound = () => {
         if (!jumpAudio) {
             jumpAudio = new Audio(jumpSoundUrl);
             jumpAudio.preload = "auto";
-            jumpAudio.volume = 0.45;
         }
 
+        applyAudioVolume(jumpAudio, {
+            baseVolume: 0.45,
+            masterVolume,
+        });
         jumpAudio.playbackRate = 0.96 + Math.random() * 0.1;
         playAudio(jumpAudio);
     } catch {
@@ -74,7 +95,7 @@ export const playJumpSound = () => {
     }
 };
 
-export const playSystemCreateSound = () => {
+export const playSystemCreateSound = (masterVolume = 1) => {
     if (typeof window === "undefined") {
         return;
     }
@@ -83,9 +104,12 @@ export const playSystemCreateSound = () => {
         if (!systemCreateAudio) {
             systemCreateAudio = new Audio(systemCreateSoundUrl);
             systemCreateAudio.preload = "auto";
-            systemCreateAudio.volume = 0.65;
         }
 
+        applyAudioVolume(systemCreateAudio, {
+            baseVolume: 0.65,
+            masterVolume,
+        });
         systemCreateAudio.playbackRate = 1;
         playAudio(systemCreateAudio);
     } catch {
@@ -93,7 +117,7 @@ export const playSystemCreateSound = () => {
     }
 }
 
-export const playSystemJoinSound = () => {
+export const playSystemJoinSound = (masterVolume = 1) => {
     if (typeof window === "undefined") {
         return;
     }
@@ -102,9 +126,12 @@ export const playSystemJoinSound = () => {
         if (!systemJoinAudio) {
             systemJoinAudio = new Audio(systemJoinSoundUrl);
             systemJoinAudio.preload = "auto";
-            systemJoinAudio.volume = 0.65;
         }
 
+        applyAudioVolume(systemJoinAudio, {
+            baseVolume: 0.65,
+            masterVolume,
+        });
         systemJoinAudio.playbackRate = 1;
         playAudio(systemJoinAudio);
     } catch {
@@ -112,7 +139,7 @@ export const playSystemJoinSound = () => {
     }
 };
 
-export const playSystemLeaveSound = () => {
+export const playSystemLeaveSound = (masterVolume = 1) => {
     if (typeof window === "undefined") {
         return;
     }
@@ -121,9 +148,12 @@ export const playSystemLeaveSound = () => {
         if (!systemLeaveAudio) {
             systemLeaveAudio = new Audio(systemLeaveSoundUrl);
             systemLeaveAudio.preload = "auto";
-            systemLeaveAudio.volume = 0.65;
         }
 
+        applyAudioVolume(systemLeaveAudio, {
+            baseVolume: 0.65,
+            masterVolume,
+        });
         systemLeaveAudio.playbackRate = 1;
         playAudio(systemLeaveAudio);
     } catch {

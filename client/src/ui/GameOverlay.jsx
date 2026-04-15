@@ -97,7 +97,7 @@ const GameOverlay = () => {
     const cameraLockMode = useGameStore((state) => state.cameraLockMode);
     const sunsetMode = useGameStore((state) => state.sunsetMode);
     // const voiceEnabled = useGameStore((state) => state.voiceEnabled);
-    const soundEnabled = useGameStore((state) => state.soundEnabled);
+    const soundEffectsVolume = useGameStore((state) => state.soundEffectsVolume);
     const videoScreenEnabled = useGameStore((state) => state.videoScreenEnabled);
     const shadowsEnabled = useGameStore((state) => state.shadowsEnabled);
     const infiniteJumpEnabled = useGameStore((state) => state.infiniteJumpEnabled);
@@ -105,7 +105,7 @@ const GameOverlay = () => {
 
     const toggleSunsetMode = useGameStore((state) => state.toggleSunsetMode);
     // const toggleVoiceEnabled = useGameStore((state) => state.toggleVoiceEnabled);
-    const toggleSoundEnabled = useGameStore((state) => state.toggleSoundEnabled);
+    const setSoundEffectsVolume = useGameStore((state) => state.setSoundEffectsVolume);
     const toggleVideoScreenEnabled = useGameStore((state) => state.toggleVideoScreenEnabled);
     const toggleShadowsEnabled = useGameStore((state) => state.toggleShadowsEnabled);
     const toggleInfiniteJumpEnabled = useGameStore((state) => state.toggleInfiniteJumpEnabled);
@@ -362,16 +362,25 @@ const GameOverlay = () => {
 
                             {/* Toggles */}
                             <div className="flex flex-col gap-1.5">
-                                <div className="flex flex-row justify-between gap-4">
-                                    <p className="whitespace-nowrap">Sound Effects</p>
-                                    <ToggleButton
-                                        ariaLabel="Toggle video screen"
-                                        enabled={soundEnabled}
-                                        onToggle={(e) => {
-                                            toggleSoundEnabled();
-                                            e.currentTarget.blur();
-                                        }}
-                                    />
+                                <div className="flex flex-row items-center justify-between gap-4">
+                                    <p className="whitespace-nowrap">Sound Effect Volume</p>
+                                    <div className="flex flex-row items-center gap-2 sm:gap-3">
+                                        <input
+                                            type="range"
+                                            min="0"
+                                            max="100"
+                                            step="1"
+                                            value={soundEffectsVolume}
+                                            onChange={(event) => {
+                                                setSoundEffectsVolume(event.target.value);
+                                            }}
+                                            aria-label="Sound effects volume slider"
+                                            className="w-24 sm:w-28 accent-primary cursor-pointer"
+                                        />
+                                        <p className="text-right tabular-nums">
+                                            {soundEffectsVolume}
+                                        </p>
+                                    </div>
                                 </div>
                                 <div className="flex flex-row justify-between gap-4">
                                     <p className="whitespace-nowrap">Video Screen Enabled</p>

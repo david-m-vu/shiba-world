@@ -594,7 +594,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
 
             {videoScreenEnabled && 
                 <FlyingScreen
-                    position={[0, 10, 30]} // orig 25
+                    position={[0, 11, 35]} // orig 25
                     rotation={[0, Math.PI, 0]}
                     screenColor={colors.screen}
                     frameColor={colors.screenFrame}
@@ -730,7 +730,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
             <primitive 
                 object={ggbModel} 
                 scale={50} 
-                position={[0, BASE_Y + 10, 300]}
+                position={[10, BASE_Y + 10, 300]}
                 rotation={[0, -Math.PI/8, 0]}
             />
 
