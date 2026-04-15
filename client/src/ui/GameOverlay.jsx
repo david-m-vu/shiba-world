@@ -11,11 +11,9 @@ import PlaybackControls from "./PlaybackControls.jsx";
 // ?react is a vite query suffix that tells the svg plug (vite-plugin0svgr) to transform the svg into a React component
 import HelpIcon from "../assets/icons/help_outline.svg?react"; 
 import SunsetIcon from "../assets/icons/sunset-icon.webp";
-import MicOnIcon from "../assets/icons/mic_none.svg?react";
 import SoundOnIcon from  "../assets/icons/sound_on.svg?react";
 
 import SunnyIcon from "../assets/icons/wb_sunny.svg?react";
-import MicOffIcon from "../assets/icons/mic_off.svg?react";
 import SoundOffIcon from "../assets/icons/sound_off.svg?react";
 
 import CopyIcon from "../assets/icons/content_copy.svg?react";
@@ -25,6 +23,8 @@ import ToggleButton from "../components/ui/ToggleButton.jsx";
 
 const TOGGLE_BUTTON_CLASS =
     "cursor-pointer select-none transition-transform duration-150 ease-out hover:scale-[1.02] active:scale-100 hover:opacity-95 active:opacity-90";
+const MIN_SOUND_EFFECTS_VOLUME = 0;
+const MAX_SOUND_EFFECTS_VOLUME = 100;
 
 const HELP_OVERLAY_SEEN_KEY = "shiba-world-help-overlay-seen-v1";
 
@@ -113,9 +113,13 @@ const GameOverlay = () => {
     const requestResetCharacter = useGameStore((state) => state.requestResetCharacter);
     const leaveRoom = useGameStore((state) => state.leaveRoom);
     const pushToast = useGameStore((state) => state.pushToast);
+    const lastNonZeroSoundEffectsVolumeRef = useRef(
+        Math.max(1, Number(soundEffectsVolume) || MAX_SOUND_EFFECTS_VOLUME)
+    );
 
     const videoQueue = Array.isArray(watchTogetherQueue) ? watchTogetherQueue : EMPTY_WATCH_QUEUE;
     const hasQueuedVideos = videoQueue.length > 0;
+    const soundEffectsMuted = soundEffectsVolume <= MIN_SOUND_EFFECTS_VOLUME;
 
     // Show help dropdown for first-time visitors, then auto-hide once.
     useEffect(() => {
@@ -138,6 +142,12 @@ const GameOverlay = () => {
             window.clearTimeout(autoHideHelpTimeoutId);
         };
     }, [isFirstVisit]);
+
+    useEffect(() => {
+        if (soundEffectsVolume > MIN_SOUND_EFFECTS_VOLUME) {
+            lastNonZeroSoundEffectsVolumeRef.current = soundEffectsVolume;
+        }
+    }, [soundEffectsVolume]);
 
     const handleResetCharacterClick = (event) => {
         requestResetCharacter();
@@ -174,6 +184,21 @@ const GameOverlay = () => {
         event.currentTarget.blur();
         await leaveRoom();
         navigate("/");
+    };
+
+    const handleToggleSoundEffectsMuted = (event) => {
+        if (soundEffectsMuted) {
+            const restoredVolume = Math.max(
+                1,
+                Math.min(MAX_SOUND_EFFECTS_VOLUME, Number(lastNonZeroSoundEffectsVolumeRef.current) || 50)
+            );
+            setSoundEffectsVolume(restoredVolume);
+        } else {
+            lastNonZeroSoundEffectsVolumeRef.current = soundEffectsVolume;
+            setSoundEffectsVolume(MIN_SOUND_EFFECTS_VOLUME);
+        }
+
+        event.currentTarget.blur();
     };
 
     return (
@@ -365,6 +390,19 @@ const GameOverlay = () => {
                                 <div className="flex flex-row items-center justify-between gap-4">
                                     <p className="whitespace-nowrap">Sound Effect Volume</p>
                                     <div className="flex flex-row items-center gap-2 sm:gap-3">
+                                        <button
+                                            type="button"
+                                            aria-label={soundEffectsMuted ? "Unmute sound effects" : "Mute sound effects"}
+                                            aria-pressed={soundEffectsMuted}
+                                            onClick={handleToggleSoundEffectsMuted}
+                                            className={TOGGLE_BUTTON_CLASS}
+                                        >
+                                            {soundEffectsMuted ? (
+                                                <SoundOffIcon className="w-4 sm:w-5 h-auto text-white" />
+                                            ) : (
+                                                <SoundOnIcon className="w-4 sm:w-5 h-auto text-white" />
+                                            )}
+                                        </button>
                                         <input
                                             type="range"
                                             min="0"
@@ -374,10 +412,13 @@ const GameOverlay = () => {
                                             onChange={(event) => {
                                                 setSoundEffectsVolume(event.target.value);
                                             }}
+                                            onPointerUp={(event) => {
+                                                event.currentTarget.blur();
+                                            }}
                                             aria-label="Sound effects volume slider"
                                             className="w-24 sm:w-28 accent-primary cursor-pointer"
                                         />
-                                        <p className="text-right tabular-nums">
+                                        <p className="w-4 sm:w-6 text-right tabular-nums">
                                             {soundEffectsVolume}
                                         </p>
                                     </div>
