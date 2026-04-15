@@ -70,7 +70,7 @@ export const createRoom = ({ socketId, playerName, worldType = "default" }) => {
     rooms.set(roomId, newRoom);
     socketToRoomId.set(socketId, roomId);
 
-    const systemMessage = createSystemChatMessage(`${createdPlayer.name} created the room.`)
+    const systemMessage = createSystemChatMessage(`${createdPlayer.name} created the room.`, { systemType: "create" })
     appendRoomMessage(newRoom, systemMessage);
 
     // return info about created room (with created player as sole player)
@@ -99,7 +99,10 @@ export const joinRoom = ({ roomId, socketId, playerName }) => {
     const player = createPlayer({ id: socketId, name: playerName });
     room.players.set(socketId, player);
     socketToRoomId.set(socketId, roomId);
-    const joinSystemMessage = appendRoomMessage(room, createSystemChatMessage(`${player.name} has joined.`));
+    const joinSystemMessage = appendRoomMessage(
+        room,
+        createSystemChatMessage(`${player.name} has joined.`, { systemType: "join" })
+    );
 
     return {
         player,
@@ -157,7 +160,10 @@ export const leaveRoom = (socketId) => {
     const statusMessage = nextHostPlayerName && hostChanged
         ? `${leavingPlayerName} has left. ${nextHostPlayerName} is the new host.`
         : `${leavingPlayerName} has left.`;
-    const leaveSystemMessage = appendRoomMessage(room, createSystemChatMessage(statusMessage));
+    const leaveSystemMessage = appendRoomMessage(
+        room,
+        createSystemChatMessage(statusMessage, { systemType: "leave" })
+    );
 
     // if we made it here, there are still players left in the room but the current player succesfully left
     return {

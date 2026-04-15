@@ -206,7 +206,10 @@ const ChatPanel = ({ topOverlay = null }) => {
                         <button
                             type="button"    
                             className="hover:cursor-pointer transition-transform duration-150 ease-out hover:scale-[1.02] active:scale-100 hover:opacity-95 active:opacity-90"
-                            onClick={toggleChatVisibility}
+                            onClick={(e) => {
+                                e.currentTarget.blur();
+                                toggleChatVisibility();
+                            }}
                         >
                             <ExpandIcon className="h-5 w-auto" />
                         </button>   
@@ -215,7 +218,10 @@ const ChatPanel = ({ topOverlay = null }) => {
                             type="button"
                             className="text-3xl leading-3.5 hover:cursor-pointer 
                                 transition-transform duration-150 ease-out hover:scale-[1.02] active:scale-100 hover:opacity-95 active:opacity-90"
-                            onClick={toggleChatVisibility}
+                            onClick={(e) => {
+                                e.currentTarget.blur();
+                                toggleChatVisibility()
+                            }}
                         >
                             -
                         </button>

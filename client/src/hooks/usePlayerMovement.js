@@ -12,8 +12,11 @@ import {
     JUMP_IMPULSE,
     LOCAL_MOVE_SPEED,
 } from "../constants/playerControls.js";
+import { useGameStore } from "../store/useGameStore.js"
 
-export const usePlayerMovement = ({ rapier, initialPosition = [0, 0, 0] }) => {
+export const usePlayerMovement = ({ rapier, initialPosition = [0, 0, 0] }) => {    
+    const playJumpSound = useGameStore((state) => state.playJumpSound);
+    
     const localPosition = useMemo(() => new Vector3(...initialPosition), [initialPosition]);
     const camForward = useMemo(() => new Vector3(), []);
     const camRight = useMemo(() => new Vector3(), []);
@@ -109,6 +112,7 @@ export const usePlayerMovement = ({ rapier, initialPosition = [0, 0, 0] }) => {
         if (jumpQueuedRef.current) {
             if (grounded || infiniteJumpEnabled) {
                 rb.applyImpulse({ x: 0, y: JUMP_IMPULSE, z: 0 }, true);
+                playJumpSound();
             }
             jumpQueuedRef.current = false;
         }

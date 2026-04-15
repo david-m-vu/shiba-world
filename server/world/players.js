@@ -85,11 +85,15 @@ export const createChatMessage = ({ playerId, playerName, text }) => {
     };
 };
 
-export const createSystemChatMessage = (text) => {
+export const createSystemChatMessage = (text, { systemType = null } = {}) => {
     const safeText = sanitizeChatMessage(text);
     if (!safeText) {
         throw new Error("System message is required.");
     }
+
+    const safeSystemType = typeof systemType === "string" && systemType.trim()
+        ? systemType.trim()
+        : null;
 
     return {
         id: randomUUID(),
@@ -98,5 +102,6 @@ export const createSystemChatMessage = (text) => {
         text: safeText,
         createdAt: new Date().toISOString(),
         type: "system",
+        systemType: safeSystemType,
     };
 };

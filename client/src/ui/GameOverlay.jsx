@@ -97,7 +97,7 @@ const GameOverlay = () => {
     const cameraLockMode = useGameStore((state) => state.cameraLockMode);
     const sunsetMode = useGameStore((state) => state.sunsetMode);
     // const voiceEnabled = useGameStore((state) => state.voiceEnabled);
-    // const soundEnabled = useGameStore((state) => state.soundEnabled);
+    const soundEnabled = useGameStore((state) => state.soundEnabled);
     const videoScreenEnabled = useGameStore((state) => state.videoScreenEnabled);
     const shadowsEnabled = useGameStore((state) => state.shadowsEnabled);
     const infiniteJumpEnabled = useGameStore((state) => state.infiniteJumpEnabled);
@@ -105,7 +105,7 @@ const GameOverlay = () => {
 
     const toggleSunsetMode = useGameStore((state) => state.toggleSunsetMode);
     // const toggleVoiceEnabled = useGameStore((state) => state.toggleVoiceEnabled);
-    // const toggleSoundEnabled = useGameStore((state) => state.toggleSoundEnabled);
+    const toggleSoundEnabled = useGameStore((state) => state.toggleSoundEnabled);
     const toggleVideoScreenEnabled = useGameStore((state) => state.toggleVideoScreenEnabled);
     const toggleShadowsEnabled = useGameStore((state) => state.toggleShadowsEnabled);
     const toggleInfiniteJumpEnabled = useGameStore((state) => state.toggleInfiniteJumpEnabled);
@@ -363,7 +363,18 @@ const GameOverlay = () => {
                             {/* Toggles */}
                             <div className="flex flex-col gap-1.5">
                                 <div className="flex flex-row justify-between gap-4">
-                                    <p className="whitespace-nowrap">(Local) Video Screen Enabled</p>
+                                    <p className="whitespace-nowrap">Sound Effects</p>
+                                    <ToggleButton
+                                        ariaLabel="Toggle video screen"
+                                        enabled={soundEnabled}
+                                        onToggle={(e) => {
+                                            toggleSoundEnabled();
+                                            e.currentTarget.blur();
+                                        }}
+                                    />
+                                </div>
+                                <div className="flex flex-row justify-between gap-4">
+                                    <p className="whitespace-nowrap">Video Screen Enabled</p>
                                     <ToggleButton
                                         ariaLabel="Toggle video screen"
                                         enabled={videoScreenEnabled}
@@ -374,7 +385,7 @@ const GameOverlay = () => {
                                     />
                                 </div>
                                 <div className="flex flex-row justify-between gap-4">
-                                    <p className="whitespace-nowrap">(Local) Shadows Enabled</p>
+                                    <p className="whitespace-nowrap">Shadows</p>
                                     <ToggleButton
                                         ariaLabel="Toggle shadows"
                                         enabled={shadowsEnabled}
@@ -385,7 +396,7 @@ const GameOverlay = () => {
                                     />
                                 </div>
                                 <div className="flex flex-row justify-between gap-4">
-                                    <p className="whitespace-nowrap">Infinite Jump Enabled</p>
+                                    <p className="whitespace-nowrap">Infinite Jump</p>
                                     <ToggleButton
                                         ariaLabel="Toggle infinite jump"
                                         enabled={infiniteJumpEnabled}
@@ -396,7 +407,7 @@ const GameOverlay = () => {
                                     />
                                 </div>
                                 <div className="flex flex-row justify-between gap-4">
-                                    <p className="whitespace-nowrap">(Local) Debug Mode Enabled</p>
+                                    <p className="whitespace-nowrap">Debug Mode</p>
                                     <ToggleButton
                                         ariaLabel="Toggle debug mode"
                                         enabled={debugModeEnabled}
