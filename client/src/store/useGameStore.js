@@ -476,7 +476,9 @@ const bindSocketListeners = (set, get, socket) => {
             playSystemJoinSound(soundMasterVolume);
         } else if (soundToPlay === "leave") {
             playSystemLeaveSound(soundMasterVolume);
-        } 
+        } else if (soundToPlay === "create") { // even chat:message event never gets emitted on room creation from server. just in case
+            playSystemCreateSound(soundMasterVolume);
+        }
     })
 
     socket.on("watch:state", (payload = {}) => {
@@ -938,6 +940,11 @@ export const useGameStore = create(
                         type: "success"
                     });
 
+                    const soundMasterVolume = toSoundEffectsMasterVolume(get().soundEffectsVolume);
+                    if (soundMasterVolume > 0) {
+                        playSystemJoinSound(soundMasterVolume);
+                    }
+
                     return {
                         ok: true,
                         roomId: response.room.id,
@@ -979,6 +986,11 @@ export const useGameStore = create(
                 set({
                     localBubbleClearTimeoutId: null,
                 });
+
+                const soundMasterVolume = toSoundEffectsMasterVolume(get().soundEffectsVolume);
+                if (soundMasterVolume > 0) {
+                    playSystemLeaveSound(soundMasterVolume);
+                }
             },
 
             refreshRoomState: async () => {
