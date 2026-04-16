@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Stats } from "@react-three/drei";
 
@@ -19,6 +19,7 @@ import SoundOffIcon from "../assets/icons/sound_off.svg?react";
 import CopyIcon from "../assets/icons/content_copy.svg?react";
 
 import PlayerListIcon from "../assets/icons/groups.svg?react";
+import PersonIcon from "../assets/icons/person.svg?react";
 import SettingsIcon from "../assets/icons/settings.svg?react";
 import ToggleButton from "../components/ui/ToggleButton.jsx";
 
@@ -26,6 +27,8 @@ const TOGGLE_BUTTON_CLASS =
     "cursor-pointer select-none transition-transform duration-150 ease-out hover:scale-[1.02] active:scale-100 hover:opacity-95 active:opacity-90";
 const MIN_SOUND_EFFECTS_VOLUME = 0;
 const MAX_SOUND_EFFECTS_VOLUME = 100;
+const PLAYER_AFK_THRESHOLD_MS = 3 * 60 * 1000;
+const PLAYER_LIST_CLOCK_INTERVAL_MS = 15 * 1000;
 
 const HELP_OVERLAY_SEEN_KEY = "shiba-world-help-overlay-seen-v1";
 
@@ -83,16 +86,49 @@ const getIsFirstVisit = () => {
 
 const EMPTY_WATCH_QUEUE = Object.freeze([]);
 
+const getIsPlayerAway = (player, nowMs) => {
+    const updatedAtMs = Date.parse(player?.updatedAt ?? "");
+    if (!Number.isFinite(updatedAtMs)) {
+        return false;
+    }
+
+    return Math.max(0, nowMs - updatedAtMs) >= PLAYER_AFK_THRESHOLD_MS;
+};
+
+const getCapacityClass = (playerCount, maxPlayers) => {
+    if (!Number.isFinite(playerCount) || !Number.isFinite(maxPlayers) || maxPlayers <= 0) {
+        return "text-[#A6A6A6]";
+    }
+
+    
+    const capacityRatio = playerCount / maxPlayers;
+    
+    if (capacityRatio < 0.75) { // 0.75 = 6/8
+        return "text-emerald-400/80";
+    } 
+    if (capacityRatio < 1) {
+        return "text-amber-300/80";
+    }
+        
+    return "text-rose-400/80";
+}
+
 const GameOverlay = () => {
     const [isFirstVisit] = useState(() => getIsFirstVisit());
     const [isHelpEnabled, setIsHelpEnabled] = useState(isFirstVisit);
     const [isSettingsEnabled, setIsSettingsEnabled] = useState(false);
     const [isPlayerListEnabled, setIsPlayerListEnabled] = useState(false);
+    const [playerListNowMs, setPlayerListNowMs] = useState(() => Date.now());
 
     const statsParentRef = useRef(null);
     const navigate = useNavigate();
 
     const currentRoomId = useGameStore((state) => state.currentRoomId)
+    const selfPlayerId = useGameStore((state) => state.selfPlayerId);
+    const hostSocketId = useGameStore((state) => state.hostSocketId);
+    const maxPlayers = useGameStore((state) => state.maxPlayers);
+    const playersById = useGameStore((state) => state.playersById);
+
     const watchTogetherQueue = useGameStore((state) => state.watchTogether.queue)
     const watchTogetherOpen = useGameStore((state) => state.watchTogetherOpen);
 
@@ -123,6 +159,40 @@ const GameOverlay = () => {
     const hasQueuedVideos = videoQueue.length > 0;
     const soundEffectsMuted = soundEffectsVolume <= MIN_SOUND_EFFECTS_VOLUME;
 
+    const players = useMemo(() => {
+        return Object.values(playersById)
+            .filter((player) => player?.id)
+            .sort((playerA, playerB) => {
+                // always put current player at the top
+                const playerAIsSelf = playerA.id === selfPlayerId;
+                const playerBIsSelf = playerB.id === selfPlayerId;
+                if (playerAIsSelf) {
+                    return -1;
+                }
+                if (playerBIsSelf) {
+                    return 1;
+                }
+
+                const playerAIsHost = playerA.id === hostSocketId;
+                const playerBIsHost = playerB.id === hostSocketId;
+
+                if (playerAIsHost) {
+                    return -1;
+                }
+                if (playerBIsHost) {
+                    return 1;
+                }
+
+                // sort everyone else alphabetically by name
+                return playerA.name.localeCompare(playerB.name);
+            });
+    }, [playersById, selfPlayerId]);
+
+    const playerCount = players.length;
+    const playerCapacityLabel = Number.isFinite(maxPlayers) && maxPlayers > 0
+        ? `${playerCount}/${maxPlayers}`
+        : String(playerCount);
+
     // Show help dropdown for first-time visitors, then auto-hide once.
     useEffect(() => {
         if (!isFirstVisit) {
@@ -150,6 +220,23 @@ const GameOverlay = () => {
             lastNonZeroSoundEffectsVolumeRef.current = soundEffectsVolume;
         }
     }, [soundEffectsVolume]);
+
+    // useEffect to setPlayerListNowMs every PLAYER_LIST_CLOCK_INTERVAL_MS
+    useEffect(() => {
+        if (!isPlayerListEnabled) {
+            return;
+        }
+
+        setPlayerListNowMs(Date.now());
+
+        const clockIntervalId = window.setInterval(() => {
+            setPlayerListNowMs(Date.now());
+        }, PLAYER_LIST_CLOCK_INTERVAL_MS);
+
+        return () => {
+            window.clearInterval(clockIntervalId);
+        };
+    }, [isPlayerListEnabled]);
 
     const handleResetCharacterClick = (event) => {
         requestResetCharacter();
@@ -359,7 +446,13 @@ const GameOverlay = () => {
                             aria-label="Toggle player list"
                             aria-pressed={isPlayerListEnabled}
                             onClick={(e) => {
-                                setIsPlayerListEnabled((prev) => !prev);
+                                setIsPlayerListEnabled((prev) => {
+                                    const nextIsEnabled = !prev;
+                                    if (nextIsEnabled) {
+                                        setIsSettingsEnabled(false);
+                                    }
+                                    return nextIsEnabled;
+                                });
                                 e.currentTarget.blur();
                             }}
                             className={TOGGLE_BUTTON_CLASS}
@@ -372,13 +465,78 @@ const GameOverlay = () => {
                             aria-label="Toggle settings"
                             aria-pressed={isSettingsEnabled}
                             onClick={(e) => {
-                                setIsSettingsEnabled((prev) => !prev);
+                                setIsSettingsEnabled((prev) => {
+                                    const nextIsEnabled = !prev;
+                                    if (nextIsEnabled) {
+                                        setIsPlayerListEnabled(false);
+                                    }
+                                    return nextIsEnabled;
+                                });
                                 e.currentTarget.blur();
                             }}
                             className={TOGGLE_BUTTON_CLASS}
                         >
                             <SettingsIcon className={`w-8 sm:w-10 h-auto ${isSettingsEnabled ? "text-primary" : "text-white"}`} />
                         </button>
+
+                        {/* Player list dropdown */}
+                        <div
+                            aria-hidden={!isPlayerListEnabled}
+                            className={`text-sm sm:text-[1rem] flex min-w-64 max-w-[calc(100vw-1rem)] flex-col absolute p-5 right-0 gap-2 top-[calc(100%+10px)] bg-[rgba(85,85,85,0.8)] rounded-2xl transition-all 
+                                duration-200 ease-out ${isPlayerListEnabled ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-1 pointer-events-none"}`}
+                        >
+                            <div className="flex flex-row items-center justify-between gap-4">
+                                <p className="whitespace-nowrap">
+                                    Players:
+                                </p>
+                                <div className={`flex flex-row items-center gap-0.5 ${getCapacityClass(playerCount, maxPlayers)}`}>
+                                    <span className="tabular-nums">{playerCapacityLabel}</span>  
+                                    <PersonIcon className="w-5 sm:w-6 h-auto shrink-0 " />
+                                </div>
+                            </div>
+                            <hr />
+                            <div className="app-scroll flex max-h-72 flex-col gap-1.5 overflow-y-auto">
+                                {players.length > 0 ? (
+                                    players.map((player) => {
+                                        const isAway = getIsPlayerAway(player, playerListNowMs);
+                                        const statusClass = isAway ? "bg-amber-300/80" : "bg-emerald-400/80";
+                                        const isSelf = player.id === selfPlayerId;
+                                        const isHost = player.id === hostSocketId;
+
+                                        return (
+                                            <div
+                                                key={player.id}
+                                                className="flex flex-row items-center justify-between gap-5 rounded-lg bg-white/10 px-3 py-1"
+                                            >
+                                                <div className="flex flex-row items-center gap-2 min-w-0">
+                                                    <p className="min-w-0 max-w-60 truncate" title={player.name}>
+                                                        {player.name}
+                                                    </p>
+                                                    <div className="flex flex-row items-center gap-1">
+                                                        {isSelf &&
+                                                            <span className="text-xs sm:text-sm px-2 py-px bg-[#37839A] rounded-3xl">YOU</span>
+                                                        }
+                                                        {isHost &&
+                                                            <span className="text-xs sm:text-sm px-2 py-px bg-primary rounded-3xl">HOST</span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex shrink-0 flex-row items-center gap-2">
+                                                    <span
+                                                        aria-label={isAway ? "Away" : "Active"}
+                                                        title={isAway ? "Away" : "Active"}
+                                                        className={`h-2.5 w-2.5 rounded-full ${statusClass}`}
+                                                    />
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <p className="whitespace-nowrap text-[#A6A6A6]">No players</p>
+                                )}
+                            </div>
+                        </div>
 
                         {/* Settings dropdown */}
                         <div

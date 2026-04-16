@@ -188,7 +188,7 @@ const normalizeWatchTogetherState = (watchTogether = {}) => {
     };
 };
 
-// This function normalizes each player in the players array and spreads them out in an object. 
+// This function normalizes each player in the players array and spreads them out in an object.
 // Returns this object
 const playersToMap = (players = []) => {
     // use object instead of map because zustand + react updates are easier, and objects serialize easily
@@ -224,10 +224,14 @@ const objectsToMap = (objects = []) => {
 const normalizeRoomState = (room = {}) => {
     const playersById = playersToMap(room.players ?? []);
     const objectsById = objectsToMap(room.objects ?? []);
-    
+    const parsedMaxPlayers = Number(room.maxPlayers);
+
     return {
         id: room.id ?? null,
         hostSocketId: room.hostSocketId ?? null,
+        maxPlayers: Number.isFinite(parsedMaxPlayers) && parsedMaxPlayers > 0
+            ? parsedMaxPlayers
+            : null,
         playersById,
         objectsById,
         messages: Array.isArray(room.messages)
@@ -274,6 +278,7 @@ const applyRoomSnapshot = (set, roomSnapshot = {}, selfPlayerId = null) => {
         currentRoomId: normalizedRoomState.id,
         selfPlayerId,
         hostSocketId: normalizedRoomState.hostSocketId,
+        maxPlayers: normalizedRoomState.maxPlayers,
         playersById: normalizedRoomState.playersById,
         objectsById: normalizedRoomState.objectsById,
         messages: normalizedRoomState.messages,
@@ -286,6 +291,7 @@ const clearRoomState = (set) => {
         currentRoomId: null,
         selfPlayerId: null,
         hostSocketId: null,
+        maxPlayers: null,
         playersById: {},
         objectsById: {},
         messages: [],
@@ -464,7 +470,7 @@ const bindSocketListeners = (set, get, socket) => {
             if (nextMessages === state.messages) {
                 return state;
             }
-            
+
             return {
                 messages: nextMessages
             }
@@ -487,7 +493,7 @@ const bindSocketListeners = (set, get, socket) => {
         set((state) => {
             const previousRawVersion = Number(state.watchTogether?.version ?? 0);
             const previousVersion = Number.isFinite(previousRawVersion) ? previousRawVersion : 0;
-            
+
             // if incoming version is <= current version in state, ignore it to prevent stale/duplicate applies
             if (incomingWatchTogether.version <= previousVersion) {
                 return state;
@@ -519,7 +525,7 @@ export const useGameStore = create(
             infiniteJumpEnabled: false,
             debugModeEnabled: false,
             resetCharacterRequestId: 0,
-            
+
             // watch together state
             watchTogetherOpen: false,
             watchTogether: createDefaultWatchTogetherState(),
@@ -528,6 +534,7 @@ export const useGameStore = create(
             currentRoomId: null,
             selfPlayerId: null, // technically the same as socketId for now
             hostSocketId: null,
+            maxPlayers: null,
 
             socket: null,
             socketId: null, // technically the same as selfPlayerId for now
@@ -583,7 +590,7 @@ export const useGameStore = create(
             clearToasts: () => {
                 set({ toasts: [] });
             },
-            
+
             setCameraLockMode: (cameraLockMode) => {
                 set({ cameraLockMode });
             },
@@ -632,8 +639,8 @@ export const useGameStore = create(
             requestResetCharacter: () => {
                 set((state) => ({ resetCharacterRequestId: state.resetCharacterRequestId + 1 }));
             },
-            
-            
+
+
             openWatchTogether: () => {
                 set({ watchTogetherOpen: true });
             },
@@ -653,9 +660,9 @@ export const useGameStore = create(
                 // sanitize commandPayload to prepare for emit
                 const safeType = String(nextPayload.type ?? "").trim();
                 if (!safeType) {
-                    return { 
-                        ok: false, 
-                        message: "Watch command type is required." 
+                    return {
+                        ok: false,
+                        message: "Watch command type is required."
                     };
                 }
                 nextPayload.type = safeType;
@@ -682,7 +689,7 @@ export const useGameStore = create(
                     }
                 }
 
-                // emit command and rely on watch:state socket event for authoritative state reconciliation -- 
+                // emit command and rely on watch:state socket event for authoritative state reconciliation --
                 // don't set state based on response, because redudant and makes local out of sync
                 try {
                     const response = await emitWithAck(socket, "watch:command", nextPayload);
@@ -697,7 +704,7 @@ export const useGameStore = create(
                     const message = error instanceof Error
                         ? error.message
                         : "Failed to update watch together state.";
-                        
+
                     return { ok: false, message };
                 }
             },
@@ -875,7 +882,7 @@ export const useGameStore = create(
                     }
 
                     applyRoomSnapshot(set, response.room, response.selfPlayerId ?? null);
-                    
+
                     set({
                         localPlayerName: playerName,
                     });
@@ -918,7 +925,7 @@ export const useGameStore = create(
                 }
 
                 try {
-                    // note that initializeSocket() doesn't do anything if socket instance is already created 
+                    // note that initializeSocket() doesn't do anything if socket instance is already created
                     // or we're already connected
                     const socket = await get().initializeSocket();
                     const response = await emitWithAck(socket, "room:join", {
@@ -1007,7 +1014,7 @@ export const useGameStore = create(
 
                     applyRoomSnapshot(set, response.room, get().selfPlayerId);
                     return { ok: true };
-                    
+
                 } catch (error) {
                     const message = error instanceof Error ? error.message : "Failed to refresh room state.";
                     return { ok: false, message };
@@ -1102,7 +1109,7 @@ export const useGameStore = create(
                 try {
                     const response = await emitWithAck(socket, "chat:send", { text: safeText });
                     if (!response.ok) {
-                        const message = response.message ?? "Failed to send message."; 
+                        const message = response.message ?? "Failed to send message.";
                         return { ok: false, message }
                     }
 
