@@ -54,7 +54,7 @@ const MultiplayerLayer = () => {
     const resetCharacterRequestId = useGameStore((state) => state.resetCharacterRequestId);
     const selfPlayerId = useGameStore((state) => state.selfPlayerId);
     const localPlayerName = useGameStore((state) => {
-        // prioritize using the server0synced source of truth for player name
+        // prioritize using the server synced source of truth for player name
         // localPlayerName is used as a fallback for early frames before self player record exists
         const selfId = state.selfPlayerId;
         if (selfId && state.playersById[selfId]?.name) {
@@ -70,6 +70,16 @@ const MultiplayerLayer = () => {
         }
 
         return String(state.playersById[selfId]?.activeMessage ?? "");
+    });
+    const localAvatarModel = useGameStore((state) => {
+        const selfId = state.selfPlayerId;
+        // prioritize using the server synced source of truth for avatar model
+        // if we read only localAvatarMode, we can miss authoritative room state after refresh/reconnect
+        if (selfId && state.playersById[selfId]?.avatarModel) {
+            return state.playersById[selfId].avatarModel;
+        }
+
+        return state.localAvatarModel;
     });
     const sendPlayerUpdate = useGameStore((state) => state.sendPlayerUpdate);
     const watchTogetherOpen = useGameStore((state) => state.watchTogetherOpen);
@@ -127,6 +137,7 @@ const MultiplayerLayer = () => {
     });
 
     const { updateAvatarRotation } = useAvatarRotation();
+
     const watchCameraPositionRef = useMemo(() => new Vector3(...WATCH_CAMERA_POSITION), []);
     const watchCameraTargetRef = useMemo(() => new Vector3(...WATCH_CAMERA_TARGET), []);
     const watchLookTargetRef = useMemo(() => new Vector3(...WATCH_CAMERA_TARGET), []);
@@ -360,6 +371,7 @@ const MultiplayerLayer = () => {
                 cameraDistanceRef,
             });
         }
+        
         updateAvatarRotation({
             rb,
             cameraLockMode,
@@ -459,6 +471,7 @@ const MultiplayerLayer = () => {
             <Avatar
                 position={localPlayerInitialPosition}
                 rotation={localPlayerInitialRotation}
+                avatarModel={localAvatarModel}
                 playerName={localPlayerName}
                 activeMessage={localActiveMessage}
                 usePhysics

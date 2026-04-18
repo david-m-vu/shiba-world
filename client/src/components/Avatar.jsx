@@ -7,17 +7,20 @@ import { useGLTF } from "@react-three/drei";
 import { RigidBody, CapsuleCollider } from "@react-three/rapier";
 
 import { AVATAR_POSITION_OFFSET } from "../constants/playerControls";
+import {
+    AVATAR_MODEL_URLS,
+    DEFAULT_AVATAR_MODEL,
+    toAvatarModelUrl,
+} from "../constants/avatarModels.js";
 import NameTag from "./NameTag.jsx";
 import SpeechBubble from "./SpeechBubble.jsx";
-
-// public/ is served at the app root URL, so client/public/models/shiba/scene.gltf is available at /models/shiba/scene.gltf
-const DOG_URL = "/models/shiba/scene.gltf";
 
 const Avatar = ({
     position = [0, 0, 0],
     rotation = [0, 0, 0],
     scale = 1,
     hidden = false,
+    avatarModel = DEFAULT_AVATAR_MODEL,
     playerName = "Anonymous",
     activeMessage = "",
     showNameTag = true,
@@ -31,7 +34,8 @@ const Avatar = ({
     visualRef = null, // represents the group ref - used for hiding avatar if camera is too close
     groupRef = null, // used for non-physics avatars (for example remote interpolation)
 }) => {
-    const { scene } = useGLTF(DOG_URL); // load GLTF file, and also cache result so multiple avatars can reuse the same loaded data
+    const modelUrl = toAvatarModelUrl(avatarModel);
+    const { scene } = useGLTF(modelUrl); // load GLTF file, and also cache result so multiple avatars can reuse the same loaded data
 
     // clone so that each avatar has its own copy of the model (can be positioned indenpendently), and useMemo to avoid cloning on every render
     const model = useMemo(() => scene.clone(true), [scene]);
@@ -83,6 +87,10 @@ const Avatar = ({
     );
 };
 
-useGLTF.preload(DOG_URL);
+// preloads avatar URLs at module load time, so when useGLTF(modelUrl) runs later, the model is already fetched/parsed
+// leads to fewer loading times on switching or spawning avatars at the cost of higher upfront network/memory usage on models players may never use
+Object.values(AVATAR_MODEL_URLS).forEach((avatarModelUrl) => {
+    useGLTF.preload(avatarModelUrl);
+});
 
 export default Avatar;

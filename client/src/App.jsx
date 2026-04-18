@@ -17,11 +17,11 @@ import GameOverlay from "./ui/GameOverlay.jsx";
 import ToastContainer from "./components/ui/ToastContainer.jsx";
 
 import { useGameStore } from "./store/useGameStore.js";
-import { INITIAL_WORLD_CAMERA_POSITION } from "./constants/playerControls.js";
 
 const App = () => {
   const cameraLockMode = useGameStore((state) => state.cameraLockMode);
   const isInRoom = useGameStore((state) => Boolean(state.currentRoomId));
+  const avatarSelectionPending = useGameStore((state) => state.avatarSelectionPending);
   const sunsetMode = useGameStore((state) => state.sunsetMode);
   const shadowsEnabled = useGameStore((state) => state.shadowsEnabled);
   const debugModeEnabled = useGameStore((state) => state.debugModeEnabled);
@@ -74,17 +74,11 @@ const App = () => {
 
         </Canvas>
         
-        {isInRoom ? 
-          <>  
-            <GameOverlay />
-          </>
-          : 
-          <Routes>
-            <Route path="/" element={<Landing/> } />
-            <Route path="/rooms/:roomId" element={<LandingJoin/>} />
-          </Routes>
-          
-        }
+        {isInRoom && !avatarSelectionPending ? <GameOverlay /> : null}
+        <Routes>
+          <Route path="/" element={<Landing/> } />
+          <Route path="/rooms/:roomId" element={<LandingJoin/>} />
+        </Routes>
         
         <ToastContainer />
       </div>

@@ -19,6 +19,7 @@ const SERVER_BASE_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:300
 
 const Landing = () => {
     const localPlayerName = useGameStore((state) => state.localPlayerName);
+    const isInRoom = useGameStore((state) => Boolean(state.currentRoomId));
     
     const [nameInput, setNameInput] = useState(localPlayerName ?? "");
     const [roomCodeInput, setRoomCodeInput] = useState("");
@@ -119,6 +120,11 @@ const Landing = () => {
             return curSearchParams;
         });
     };
+
+    
+    if (isInRoom) {
+        return null;
+    }
 
     return (
         <LandingShell

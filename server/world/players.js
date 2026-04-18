@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { sanitizeAvatarModel } from "./avatarModels.js";
 
 export const PLAYER_NAME_MAX_LENGTH = 32;
 export const CHAT_MESSAGE_MAX_LENGTH = 240;
@@ -31,7 +32,7 @@ export const sanitizeChatMessage = (value) => {
     return clampString(value, CHAT_MESSAGE_MAX_LENGTH);
 };
 
-export const createPlayer = ({ id, name, position, rotation }) => {
+export const createPlayer = ({ id, name, position, rotation, avatarModel }) => {
     const safeName = sanitizePlayerName(name);
     if (!safeName) { 
         throw new Error("Player name is required.");
@@ -40,6 +41,7 @@ export const createPlayer = ({ id, name, position, rotation }) => {
     return { // player object
         id,
         name: safeName,
+        avatarModel: sanitizeAvatarModel(avatarModel),
         position: normalizeVector3(position, DEFAULT_POSITION),
         rotation: normalizeVector3(rotation, DEFAULT_ROTATION),
         activeMessage: "", // represents current active speech bubble, not their full chat history. Chat history lives at the room level in room.messages
@@ -62,6 +64,10 @@ export const applyPlayerState = (player, nextState = {}) => {
     // such as clearing the speech bubble after a timeout
     if (nextState.activeMessage !== undefined) {
         player.activeMessage = sanitizeChatMessage(nextState.activeMessage);
+    }
+    
+    if (nextState.avatarModel !== undefined) {
+        player.avatarModel = sanitizeAvatarModel(nextState.avatarModel);
     }
 
     player.updatedAt = new Date().toISOString();

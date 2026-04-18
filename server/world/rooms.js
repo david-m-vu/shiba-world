@@ -63,10 +63,10 @@ export const getRoomPublicStatus = (roomId) => {
 /**
  * Creates a new room with a generated invite code and registers the given, creating
  * socket as both the room host and the first player.
- * @param {{ socketId: string, playerName: string, worldType?: string }} params
+ * @param {{ socketId: string, playerName: string, worldType?: string, avatarModel?: string }} params
  * @returns {{ roomId: string, player: object, room: object }}
  */
-export const createRoom = ({ socketId, playerName, worldType = "default" }) => {
+export const createRoom = ({ socketId, playerName, worldType = "default", avatarModel }) => {
     let roomId = createRoomId();
 
     // to prevent collisions
@@ -88,7 +88,7 @@ export const createRoom = ({ socketId, playerName, worldType = "default" }) => {
         maxPlayers: MAX_PLAYERS_PER_ROOM
     };
 
-    const createdPlayer = createPlayer({ id: socketId, name: playerName });
+    const createdPlayer = createPlayer({ id: socketId, name: playerName, avatarModel });
     newRoom.players.set(socketId, createdPlayer);
 
     rooms.set(roomId, newRoom);
@@ -105,7 +105,7 @@ export const createRoom = ({ socketId, playerName, worldType = "default" }) => {
 };
 
 // update room object to include new player
-export const joinRoom = ({ roomId, socketId, playerName }) => {
+export const joinRoom = ({ roomId, socketId, playerName, avatarModel }) => {
     const room = rooms.get(roomId) ?? null;
     if (!room) {
         throw new Error("Room not found.");
@@ -126,7 +126,7 @@ export const joinRoom = ({ roomId, socketId, playerName }) => {
         throw new Error(`Room is full. Maximum ${maxPlayers} players allowed.`);
     }
 
-    const player = createPlayer({ id: socketId, name: playerName });
+    const player = createPlayer({ id: socketId, name: playerName, avatarModel });
     room.players.set(socketId, player);
     socketToRoomId.set(socketId, roomId);
     const joinSystemMessage = appendRoomMessage(
@@ -210,7 +210,7 @@ export const leaveRoom = (socketId) => {
 };
 
 // similar to joinRoom, but also leaves the current room if the socket is in one before joining the given, new one
-export const moveSocketToRoom = ({ roomId, socketId, playerName }) => {
+export const moveSocketToRoom = ({ roomId, socketId, playerName, avatarModel }) => {
     const targetRoom = rooms.get(roomId) ?? null;
     if (!targetRoom) {
         throw new Error("Room not found.");
@@ -233,7 +233,7 @@ export const moveSocketToRoom = ({ roomId, socketId, playerName }) => {
 
     const departureObj = removeSocketFromCurrentRoom(socketId);
 
-    const player = createPlayer({ id: socketId, name: playerName });
+    const player = createPlayer({ id: socketId, name: playerName, avatarModel });
     targetRoom.players.set(socketId, player);
     socketToRoomId.set(socketId, roomId);
     const joinSystemMessage = appendRoomMessage(
