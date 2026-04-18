@@ -1,0 +1,11 @@
+Model Information:
+* title:	Constellation Shiba
+* source:	https://sketchfab.com/3d-models/constellation-shiba-df20a205f05a4878a24ffd72d745bde6
+* author:	Elpiedras (https://sketchfab.com/Elpiedras)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Constellation Shiba" (https://sketchfab.com/3d-models/constellation-shiba-df20a205f05a4878a24ffd72d745bde6) by Elpiedras (https://sketchfab.com/Elpiedras) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

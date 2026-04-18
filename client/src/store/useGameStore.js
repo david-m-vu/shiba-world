@@ -8,6 +8,10 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { createGameSocket, emitWithAck } from "../lib/socketClient.js";
 import { toSafeVector3, toSafeVector4 } from "../lib/util.js";
 import {
+    DEFAULT_AVATAR_MODEL,
+    normalizeAvatarModel,
+} from "../constants/avatarModels.js";
+import {
     playChatSound,
     playJumpSound as playJumpSoundEffect,
     playSystemJoinSound,
@@ -89,6 +93,7 @@ const normalizePlayer = (player = {}) => {
     return {
         id: String(player.id ?? ""),
         name: String(player.name ?? "Anonymous"),
+        avatarModel: normalizeAvatarModel(player.avatarModel),
         position: toSafeVector3(player.position, [0, 5, 0]),
         rotation: toSafeVector3(player.rotation, [0, 0, 0]),
         activeMessage: String(player.activeMessage ?? ""),
@@ -298,6 +303,7 @@ const clearRoomState = (set) => {
         watchTogether: createDefaultWatchTogetherState(),
         cameraLockMode: false,
         watchTogetherOpen: false,
+        avatarSelectionPending: false,
     })
 }
 
@@ -414,7 +420,9 @@ const bindSocketListeners = (set, get, socket) => {
 
         set((state) => {
             const previousPlayer = state.playersById[incomingPlayer.id];
+            const isSelfPlayer = incomingPlayer.id === state.selfPlayerId;
             return {
+                ...(isSelfPlayer ? { localAvatarModel: incomingPlayer.avatarModel } : {}),
                 playersById: {
                     ...state.playersById,
                     [incomingPlayer.id]: previousPlayer ? {
@@ -531,9 +539,12 @@ export const useGameStore = create(
             watchTogether: createDefaultWatchTogetherState(),
 
             localPlayerName: "",
-            currentRoomId: null,
+            localAvatarModel: DEFAULT_AVATAR_MODEL,
+            avatarSelectionPending: false,
             selfPlayerId: null, // technically the same as socketId for now
             hostSocketId: null,
+
+            currentRoomId: null,
             maxPlayers: null,
 
             socket: null,
@@ -646,6 +657,23 @@ export const useGameStore = create(
             },
             closeWatchTogether: () => {
                 set({ watchTogetherOpen: false });
+            },
+
+            setLocalAvatarModel: (avatarModel) => {
+                set({
+                    localAvatarModel: normalizeAvatarModel(avatarModel),
+                });
+            },
+            completeAvatarSelection: (avatarModel) => {
+                const safeAvatarModel = normalizeAvatarModel(avatarModel ?? get().localAvatarModel);
+                set({
+                    localAvatarModel: safeAvatarModel,
+                    avatarSelectionPending: false,
+                });
+
+                get().sendPlayerUpdate({
+                    avatarModel: safeAvatarModel,
+                });
             },
 
             // commandPayload expects type, (video, queueIndex, timeSec, playbackStatus playbackRate...)
@@ -867,13 +895,18 @@ export const useGameStore = create(
                 return socket;
             },
 
-            createRoom: async ({ playerName, worldType = "rooftop" } = {}) => {
+            // you can either create the room with a given avatar model already passed in, or, if not given, then avatar will be chosen
+            // after room is created on selection screen. Avatar model will initially be the default shiba
+            createRoom: async ({ playerName, worldType = "rooftop", avatarModel } = {}) => {
                 // note this function assumes that playerName is safe (already trimmed)
+                const safeAvatarModel = normalizeAvatarModel(avatarModel ?? get().localAvatarModel);
+
                 try {
                     const socket = await get().initializeSocket();
                     const response = await emitWithAck(socket, "room:create", {
                         playerName: playerName,
                         worldType,
+                        avatarModel: safeAvatarModel,
                     })
 
                     if (!response.ok || !response.room?.id) {
@@ -885,6 +918,8 @@ export const useGameStore = create(
 
                     set({
                         localPlayerName: playerName,
+                        localAvatarModel: safeAvatarModel,
+                        avatarSelectionPending: true,
                     });
 
                     const shareableLink = buildRoomShareLink(response.room.id);
@@ -910,9 +945,12 @@ export const useGameStore = create(
                 }
             },
 
-            joinRoom: async ({ roomId, playerName } = {}) => {
+            // you can either join the room with a given avatar model already passed in, or, if not given, then avatar will be chosen
+            // after room is joined on selection screen. Avatar model will initially be the default shiba
+            joinRoom: async ({ roomId, playerName, avatarModel } = {}) => {
                 const safeRoomId = String(roomId ?? "").trim();
                 const safePlayerName = String(playerName ?? "").trim();
+                const safeAvatarModel = normalizeAvatarModel(avatarModel ?? get().localAvatarModel);
 
                 if (!safeRoomId) {
                     const message = "Room ID is required.";
@@ -931,6 +969,7 @@ export const useGameStore = create(
                     const response = await emitWithAck(socket, "room:join", {
                         roomId: safeRoomId,
                         playerName: safePlayerName,
+                        avatarModel: safeAvatarModel,
                     })
 
                     if (!response.ok || !response.room?.id) {
@@ -940,7 +979,9 @@ export const useGameStore = create(
 
                     applyRoomSnapshot(set, response.room, response.selfPlayerId ?? null);
                     set({
-                        localPlayerName: safePlayerName
+                        localPlayerName: safePlayerName,
+                        localAvatarModel: safeAvatarModel,
+                        avatarSelectionPending: true,
                     })
 
                     get().pushToast(`Joined room ${response.room.id}.`, {
@@ -1021,7 +1062,7 @@ export const useGameStore = create(
                 }
             },
 
-            sendPlayerUpdate: ({ position, rotation, activeMessage } = {}) => {
+            sendPlayerUpdate: ({ position, rotation, activeMessage, avatarModel } = {}) => {
                 const socket = get().socket;
                 const selfPlayerId = get().selfPlayerId;
 
@@ -1039,6 +1080,9 @@ export const useGameStore = create(
                 if (activeMessage !== undefined) {
                     payload.activeMessage = String(activeMessage);
                 }
+                if (avatarModel !== undefined) {
+                    payload.avatarModel = normalizeAvatarModel(avatarModel);
+                }
 
                 // if no fields are in the payload (no args provided), don't emit at all
                 if (Object.keys(payload).length === 0) {
@@ -1047,10 +1091,12 @@ export const useGameStore = create(
 
                 socket.emit("player:update", payload);
 
+                // update the playersById local state since server does a socket.to, not an io.to
                 set((state) => {
                     const previousPlayerObj = state.playersById[selfPlayerId] ?? normalizePlayer({
                         id: selfPlayerId,
                         name: state.localPlayerName,
+                        avatarModel: state.localAvatarModel,
                     })
 
                     return {
@@ -1061,6 +1107,7 @@ export const useGameStore = create(
                                 ...(payload.position ? { position: payload.position } : {}), // need to write it like this so position doesn't get nullified if given position is undefined
                                 ...(payload.rotation ? { rotation: payload.rotation } : {}),
                                 ...(payload.activeMessage !== undefined ? { activeMessage: payload.activeMessage } : {}),
+                                ...(payload.avatarModel !== undefined ? { avatarModel: payload.avatarModel } : {}),
                                 updatedAt: new Date().toISOString(),
                             }
                         }
@@ -1141,6 +1188,7 @@ export const useGameStore = create(
             partialize: (state) => ({ // partial state to persist across refreshes. Persist middleware saves only this object to localStorage, not the full zustand state
                 sunsetMode: state.sunsetMode,
                 localPlayerName: state.localPlayerName,
+                localAvatarModel: state.localAvatarModel,
                 soundEffectsVolume: state.soundEffectsVolume,
                 watchVolume: state.watchVolume,
                 watchMuted: state.watchMuted,

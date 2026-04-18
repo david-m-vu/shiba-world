@@ -79,6 +79,7 @@ const RemoteAvatar = ({ player }) => {
             position={initialPosition}
             rotation={initialRotation}
             usePhysics={false}
+            avatarModel={player.avatarModel}
             playerName={player.name}
             activeMessage={player.activeMessage}
             groupRef={rootRef}

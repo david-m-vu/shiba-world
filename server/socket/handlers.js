@@ -49,7 +49,7 @@ export const registerSocketHandlers = (io, socket) => {
     console.log(`${socket.id} connected`)
 
     // room:create does three things: leaves previous room (if any), creates a new room, and place the creator into it
-    // payload is an object of { playerName, worldType }
+    // payload is an object of { playerName, worldType, avatarModel }
     socket.on("room:create", async (payload = {}, callback) => {
         try {
             // NOTE: this leaving and joining flow doesn't have the same concurrency issue as room:join where two players try joining a 7/8 room at the same time
@@ -63,6 +63,7 @@ export const registerSocketHandlers = (io, socket) => {
                 socketId: socket.id,
                 playerName: payload.playerName,
                 worldType: payload.worldType,
+                avatarModel: payload.avatarModel,
             });
 
             // join the socket to the new room
@@ -85,7 +86,7 @@ export const registerSocketHandlers = (io, socket) => {
     });
 
     // note that room:join is only for another user entering an existing room.
-    // payload is an object of { roomId, playerName } 
+    // payload is an object of { roomId, playerName, avatarModel } 
     socket.on("room:join", async (payload = {}, callback) => {
         try {
             const targetRoomId = String(payload.roomId ?? "").trim();
@@ -97,6 +98,7 @@ export const registerSocketHandlers = (io, socket) => {
                 roomId: targetRoomId,
                 socketId: socket.id,
                 playerName: payload.playerName,
+                avatarModel: payload.avatarModel,
             });
 
             emitDeparture(io, socket, joinedRoomObj.departureObj);

@@ -186,7 +186,7 @@ const GameOverlay = () => {
                 // sort everyone else alphabetically by name
                 return playerA.name.localeCompare(playerB.name);
             });
-    }, [playersById, selfPlayerId]);
+    }, [hostSocketId, playersById, selfPlayerId]);
 
     const playerCount = players.length;
     const playerCapacityLabel = Number.isFinite(maxPlayers) && maxPlayers > 0
