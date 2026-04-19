@@ -12,10 +12,10 @@ const AVATAR_MODEL_SET = new Set(AVATAR_MODELS);
 
 export const AVATAR_MODEL_URLS = Object.freeze({
     astro_shiba: "/models/astro_shiba/scene.gltf",
-    black_shiba: "/models/black_shiba/scene.gltf",
-    bodyguard_shiba: "/models/bodyguard_shiba/scene.gltf",
-    constellation_shiba: "/models/constellation_shiba/scene.gltf",
-    shiba: "/models/shiba/scene.gltf",
+    black_shiba: "/models/black_shiba/scene.glb",
+    bodyguard_shiba: "/models/bodyguard_shiba/scene.glb",
+    constellation_shiba: "/models/constellation_shiba/scene.glb",
+    shiba: "/models/shiba/scene.glb",
 });
 
 export const normalizeAvatarModel = (value) => {
