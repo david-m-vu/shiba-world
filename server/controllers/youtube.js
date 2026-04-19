@@ -198,6 +198,8 @@ const getTrendingMusicVideos = async (response, youtubeApiKey) => {
 }
 
 export const getPreset = async (request, response) => {
+    console.log(request.query)
+    
     const kind = String(request.query.kind ?? "").trim();
     if (!kind) {
         return response.status(400).json({

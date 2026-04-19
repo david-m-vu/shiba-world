@@ -141,14 +141,14 @@ const initializeRoomStore = async () => {
         throw new Error("REDIS_URL is required when ROOM_STORE_DRIVER=redis.");
     }
 
-    const redisRoomStore = await createRedisRoomStore({
-        redisUrl: REDIS_URL,
-        keyPrefix: ROOM_STORE_KEY_PREFIX,
-    });
+    // const redisRoomStore = await createRedisRoomStore({
+    //     redisUrl: REDIS_URL,
+    //     keyPrefix: ROOM_STORE_KEY_PREFIX,
+    // });
 
-    // store the object reference of the RedisRoomStore object in memory
-    setRoomStore(redisRoomStore);
-    console.log(`RoomStore driver: redis (${ROOM_STORE_KEY_PREFIX})`);
+    // // store the object reference of the RedisRoomStore object in memory
+    // setRoomStore(redisRoomStore);
+    // console.log(`RoomStore driver: redis (${ROOM_STORE_KEY_PREFIX})`);
 };
 
 const startServer = async () => {
