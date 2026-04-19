@@ -164,6 +164,8 @@ const FlyingScreen = ({
                     width: "100%",
                     height: "100%",
                     playerVars: {
+                        enablejsapi: 1,
+                        origin: window.location.origin, // Safety requirement when enablejsapi is 1
                         controls: 0,
                         disablekb: 1,
                         fs: 0,
