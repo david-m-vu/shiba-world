@@ -8,6 +8,14 @@ const PerimeterRailing = ({
     color,
     metalness = 0,
     roughness = 0.5,
+    glass = false,
+    glassMode = "physical",
+    opacity = 1,
+    transmission = 0,
+    ior = 1.45,
+    thickness = 0.12,
+    clearcoat = 0,
+    clearcoatRoughness = 0.05,
     anchor = "center",
     rotation = [0, 0, 0],
     ...meshProps
@@ -28,7 +36,30 @@ const PerimeterRailing = ({
             <CuboidCollider args={colliderHalf} />
             <mesh castShadow receiveShadow {...meshProps}>
                 <boxGeometry args={args} />
-                <meshStandardMaterial color={color} metalness={metalness} roughness={roughness} />
+                {glass && glassMode === "physical" ? (
+                    <meshPhysicalMaterial
+                        color={color}
+                        metalness={metalness}
+                        roughness={roughness}
+                        transparent
+                        opacity={opacity}
+                        transmission={transmission}
+                        ior={ior}
+                        thickness={thickness}
+                        clearcoat={clearcoat}
+                        clearcoatRoughness={clearcoatRoughness}
+                    />
+                ) : glass ? (
+                    <meshStandardMaterial
+                        color={color}
+                        metalness={metalness}
+                        roughness={roughness}
+                        transparent
+                        opacity={opacity}
+                    />
+                ) : (
+                    <meshStandardMaterial color={color} metalness={metalness} roughness={roughness} />
+                )}
             </mesh>
         </RigidBody>
     )

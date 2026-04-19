@@ -31,6 +31,7 @@ const ANIME_GIRL_URL = "/models/just_a_girl/scene.gltf";
 const DEFAULT_COLORS = {
     background: "#9fc4ff",
     fog: "#b27389",
+    ledgeGround: "#c6e0c7",
     rooftopSurface: "#DBDAD6",
     rooftopSlab: "#c6e0c7",
     rooftopStairBulkhead: "#db9547",
@@ -76,6 +77,7 @@ const BASE_Y = -30;
 
 const ROOFTOP_SIZE = [60, 30, 30];
 const ROOFTOP_Y = 0;
+const LEDGE_SIZE = [15, ROOFTOP_SIZE[1], 3];
 
 const BULKHEAD_SIZE = [11, ROOFTOP_SIZE[1] + 8, 8]
 
@@ -361,6 +363,7 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
         addFolderColor(rooftop, "rooftopSlab", "Slab");
         addFolderColor(rooftop, "railing", "Railings");
         addFolderColor(rooftop, "rooftopStairBulkhead", "Stair Bulkhead");
+        addFolderColor(rooftop, "ledgeGround", "Ledge Ground")
         addFolderColor(rooftop, "loungeChairSectionGround", "Secondary Ground");
         addFolderColor(rooftop, "door", "Door");
         addFolderColor(rooftop, "overhangSlab", "Overhang Slab")
@@ -440,6 +443,20 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
                     hasSeparateSurface
                     surfaceColor={colors.rooftopSurface}
                 />
+
+                {/* watch together ledge */}
+                <Slab 
+                    position={[0, BASE_Y, (ROOFTOP_SIZE[2] / 2) + (LEDGE_SIZE[2] / 2)]}
+                    size={LEDGE_SIZE}
+                    color={colors.rooftopSlab}
+                    roughness={0.8}
+                    hasSeparateSurface
+                    surfaceColor={colors.rooftopSurface}
+                />
+                <mesh rotation-x={-Math.PI / 2} position={[0, 0.02, (ROOFTOP_SIZE[2] / 2) + (LEDGE_SIZE[2] / 2)]} receiveShadow>
+                    <planeGeometry args={[LEDGE_SIZE[0], LEDGE_SIZE[2]]} />
+                    <meshStandardMaterial color={colors.ledgeGround} roughness={0.75} metalness={0.05} />
+                </mesh>
                 
                 {/* rooftop stair bulkhead */}
                 <group position={[-(ROOFTOP_SIZE[0] / 2 - BULKHEAD_SIZE[0] / 2), BASE_Y, -(ROOFTOP_SIZE[2] / 2 + BULKHEAD_SIZE[2] / 2)]}>
@@ -508,12 +525,56 @@ const SharedEnvironment = ({ debug = false, isSunset = false, useOceanShaders = 
             
 
 
-            {/* front and back railings */}
+            {/* front railings - from left to right */}
             <PerimeterRailing 
-                position={[0, ROOFTOP_Y, (ROOFTOP_SIZE[2] / 2) - (RAILING_DEPTH / 2)]} 
-                args={[ROOFTOP_SIZE[0], 1.2, RAILING_DEPTH]} 
+                position={[ROOFTOP_SIZE[0] / 2, ROOFTOP_Y, (ROOFTOP_SIZE[2] / 2)]} 
+                args={[ROOFTOP_SIZE[0] / 2 - LEDGE_SIZE[0] / 2, 1.2, RAILING_DEPTH]} 
                 color={colors.railing} 
+                anchor="maxXmaxZ"
             />
+            <PerimeterRailing 
+                position={[(LEDGE_SIZE[0] / 2), ROOFTOP_Y, (ROOFTOP_SIZE[2] / 2) + LEDGE_SIZE[2] - RAILING_DEPTH]} 
+                args={[RAILING_DEPTH, 1.2, LEDGE_SIZE[2]]} 
+                color="#dcefff"
+                glass
+                glassMode="cheap"
+                roughness={0.06}
+                opacity={0.25}
+                castShadow={false}
+                receiveShadow={false}
+                anchor="maxXmaxZ"
+            />
+            <PerimeterRailing 
+                position={[0, ROOFTOP_Y, (ROOFTOP_SIZE[2] / 2 + LEDGE_SIZE[2]) - (RAILING_DEPTH / 2)]} 
+                args={[LEDGE_SIZE[0], 1.2, RAILING_DEPTH]} 
+                color="#dcefff"
+                glass
+                glassMode="cheap"
+                roughness={0.06}
+                opacity={0.25}
+                castShadow={false}
+                receiveShadow={false}
+            />
+            <PerimeterRailing 
+                position={[-(LEDGE_SIZE[0] / 2), ROOFTOP_Y, (ROOFTOP_SIZE[2] / 2) + LEDGE_SIZE[2] - RAILING_DEPTH]} 
+                args={[RAILING_DEPTH, 1.2, LEDGE_SIZE[2]]} 
+                color="#dcefff"
+                glass
+                glassMode="cheap"
+                roughness={0.06}
+                opacity={0.25}
+                castShadow={false}
+                receiveShadow={false}
+                anchor="minXmaxZ"
+            />
+            <PerimeterRailing 
+                position={[-(ROOFTOP_SIZE[0] / 2), ROOFTOP_Y, (ROOFTOP_SIZE[2] / 2)]} 
+                args={[ROOFTOP_SIZE[0] / 2 - LEDGE_SIZE[0] / 2, 1.2, RAILING_DEPTH]} 
+                color={colors.railing} 
+                anchor="minXmaxZ"
+            />
+
+            {/* back railings */}
             <PerimeterRailing 
                 position={[-(ROOFTOP_SIZE[0] / 2 - BULKHEAD_SIZE[0]), 0, -(ROOFTOP_SIZE[2] / 2 + BULKHEAD_SIZE[2])]} 
                 args={[4, 2, RAILING_DEPTH]} 
