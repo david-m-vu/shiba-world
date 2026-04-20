@@ -43,11 +43,11 @@ const PerimeterRailing = ({
                         roughness={roughness}
                         transparent
                         opacity={opacity}
-                        transmission={transmission}
-                        ior={ior}
-                        thickness={thickness}
-                        clearcoat={clearcoat}
-                        clearcoatRoughness={clearcoatRoughness}
+                        transmission={transmission} // how much light passes through physically
+                        ior={ior} // index of refraction - glass is around 1.45
+                        thickness={thickness} // virtual material thickness
+                        clearcoat={clearcoat} // extra glossy top layer
+                        clearcoatRoughness={clearcoatRoughness} // blur on clearocat reflection (0 sharp, higher = blurrier)
                     />
                 ) : glass ? (
                     <meshStandardMaterial
