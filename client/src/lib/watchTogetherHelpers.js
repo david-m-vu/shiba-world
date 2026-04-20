@@ -140,13 +140,19 @@ export const getEffectiveWatchTimeSec = (watchTogether = {}) => {
     const playbackRate = Number(watchTogether.playbackRate);
     const anchorTimeSec = Number(watchTogether.anchorTimeSec);
     const anchorServerTsMs = Number(watchTogether.anchorServerTsMs);
+    const serverNowMs = Number(watchTogether.serverNowMs);
+    const clientReceivedAtMs = Number(watchTogether.clientReceivedAtMs);
 
     const safePlaybackRate = Number.isFinite(playbackRate) ? playbackRate : 1;
     const safeAnchorTimeSec = Number.isFinite(anchorTimeSec) ? Math.max(0, anchorTimeSec) : 0;
     const safeAnchorServerTsMs = Number.isFinite(anchorServerTsMs) ? anchorServerTsMs : Date.now();
+    const safeServerNowMs = Number.isFinite(serverNowMs) ? serverNowMs : safeAnchorServerTsMs;
+    const safeClientReceivedAtMs = Number.isFinite(clientReceivedAtMs) ? clientReceivedAtMs : Date.now();
 
     if (playbackStatus === "playing") {
-        const elapsedSec = Math.max(0, (Date.now() - safeAnchorServerTsMs) / 1000);
+        const serverElapsedMs = safeServerNowMs - safeAnchorServerTsMs;
+        const clientElapsedMs = Date.now() - safeClientReceivedAtMs;
+        const elapsedSec = Math.max(0, (serverElapsedMs + clientElapsedMs) / 1000);
         return Math.max(0, safeAnchorTimeSec + (elapsedSec * safePlaybackRate));
     }
 

@@ -103,9 +103,9 @@ const WatchTogetherInterface = ({ isOpen }) => {
     const playbackStatus = String(watchTogether.playbackStatus ?? "paused").toLowerCase() === "playing" ? "playing" : "paused";
     const playbackRate = Number.isFinite(Number(watchTogether.playbackRate)) ? Number(watchTogether.playbackRate) : 1;
     const anchorTimeSec = Number.isFinite(Number(watchTogether.anchorTimeSec)) ? Number(watchTogether.anchorTimeSec) : 0;
-    const anchorServerTsMs = Number.isFinite(Number(watchTogether.anchorServerTsMs))
-        ? Number(watchTogether.anchorServerTsMs)
-        : Date.now(); // fallback to Date.now() makes elapsed time ~0, so behavior degrades safely to "play near ahcorTimeSec" until real server state arrives
+    const anchorServerTsMs = Number(watchTogether.anchorServerTsMs);
+    const serverNowMs = Number(watchTogether.serverNowMs);
+    const clientReceivedAtMs = Number(watchTogether.clientReceivedAtMs);
 
     const hasQueuedVideos = videoQueue.length > 0;
     const currentQueuedVideo = currentQueueIndex >= 0 ? (videoQueue[currentQueueIndex] ?? null) : null;
@@ -305,6 +305,8 @@ const WatchTogetherInterface = ({ isOpen }) => {
             playbackRate,
             anchorTimeSec,
             anchorServerTsMs,
+            serverNowMs,
+            clientReceivedAtMs,
         });
         const safeEffectiveTimeSec = Number.isFinite(effectiveTimeSec) ? Math.max(0, effectiveTimeSec) : 0;
 
@@ -372,9 +374,11 @@ const WatchTogetherInterface = ({ isOpen }) => {
     }, [
         anchorServerTsMs,
         anchorTimeSec,
+        clientReceivedAtMs,
         currentVideoId,
         playbackRate,
         playbackStatus,
+        serverNowMs,
         suppressPlayerEvents,
     ]); // since syncPlayerToWatchState uses these variables in its closure, if the function didn't update when these changed, it could run with stale values and sync the player to old state
 

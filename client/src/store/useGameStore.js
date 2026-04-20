@@ -114,13 +114,17 @@ const normalizeObjectState = (objectState = {}) => {
 }
 
 const createDefaultWatchTogetherState = () => {
+    const nowMs = Date.now();
+
     return {
         queue: [],
         currentQueueIndex: -1,
         playbackStatus: "paused",
         playbackRate: 1,
         anchorTimeSec: 0, // authoritative video time in s at a known moment (ex: if someone seeks to 53.2, server sets anchorTimeSec = 53.2)
-        anchorServerTsMs: Date.now(), // server's timestamp in ms for when the anchor was recorded. Clients use this with anchorTimeSec
+        anchorServerTsMs: nowMs, // server's timestamp in ms for when the anchor was recorded. Clients use this with anchorTimeSec
+        serverNowMs: nowMs, // server timestamp when this watch state was serialized
+        clientReceivedAtMs: nowMs, // browser timestamp when this watch state was received
         version: 0, // monotonic state revision number - lets clients ignore stale/out-of-order watch:stack packets (higher version wins)
         updatedBy: null,
         updatedAt: null,
@@ -145,6 +149,7 @@ const normalizeWatchQueueVideo = (video = {}) => {
 };
 
 const normalizeWatchTogetherState = (watchTogether = {}) => {
+    const clientReceivedAtMs = Date.now();
     const fallback = createDefaultWatchTogetherState();
     const queue = Array.isArray(watchTogether.queue)
         ? watchTogether.queue.map((video) => normalizeWatchQueueVideo(video)).filter(Boolean)
@@ -175,6 +180,11 @@ const normalizeWatchTogetherState = (watchTogether = {}) => {
         ? rawAnchorServerTsMs
         : fallback.anchorServerTsMs;
 
+    const rawServerNowMs = Number(watchTogether.serverNowMs);
+    const serverNowMs = Number.isFinite(rawServerNowMs)
+        ? rawServerNowMs
+        : anchorServerTsMs;
+
     const rawVersion = Number(watchTogether.version);
     const version = Number.isFinite(rawVersion)
         ? Math.max(0, Math.floor(rawVersion))
@@ -187,6 +197,8 @@ const normalizeWatchTogetherState = (watchTogether = {}) => {
         playbackRate,
         anchorTimeSec,
         anchorServerTsMs,
+        serverNowMs,
+        clientReceivedAtMs,
         version,
         updatedBy: watchTogether.updatedBy ? String(watchTogether.updatedBy) : null,
         updatedAt: watchTogether.updatedAt ? String(watchTogether.updatedAt) : null,

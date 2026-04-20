@@ -198,6 +198,7 @@ export const cloneWatchTogetherState = (watchTogether) => {
         playbackRate: sanitizeWatchPlaybackRate(watchTogether?.playbackRate, fallbackState.playbackRate),
         anchorTimeSec: sanitizeWatchTimeSec(watchTogether?.anchorTimeSec, fallbackState.anchorTimeSec),
         anchorServerTsMs: toFiniteNumber(watchTogether?.anchorServerTsMs, fallbackState.anchorServerTsMs),
+        serverNowMs: Date.now(), // server timestamp when this watch state was serialized
         version: Math.max(0, toFiniteNumber(watchTogether?.version, fallbackState.version)),
         updatedBy: watchTogether?.updatedBy ? String(watchTogether.updatedBy) : null,
         updatedAt: sanitizeWatchText(watchTogether?.updatedAt, 64) || fallbackState.updatedAt,

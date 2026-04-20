@@ -45,7 +45,9 @@ const FlyingScreen = ({
     const playbackStatus = String(watchTogether.playbackStatus ?? "paused").toLowerCase() === "playing" ? "playing" : "paused";
     const playbackRate = Number.isFinite(Number(watchTogether.playbackRate)) ? Number(watchTogether.playbackRate) : 1;
     const anchorTimeSec = Number.isFinite(Number(watchTogether.anchorTimeSec)) ? Number(watchTogether.anchorTimeSec) : 0;
-    const anchorServerTsMs = Number.isFinite(Number(watchTogether.anchorServerTsMs)) ? Number(watchTogether.anchorServerTsMs) : 0;
+    const anchorServerTsMs = Number(watchTogether.anchorServerTsMs);
+    const serverNowMs = Number(watchTogether.serverNowMs);
+    const clientReceivedAtMs = Number(watchTogether.clientReceivedAtMs);
 
     const currentQueuedVideo = currentQueueIndex >= 0 ? (videoQueue[currentQueueIndex] ?? null) : null;
     const currentVideoId = currentQueuedVideo?.videoId ?? "";
@@ -93,6 +95,8 @@ const FlyingScreen = ({
             playbackRate,
             anchorTimeSec,
             anchorServerTsMs,
+            serverNowMs,
+            clientReceivedAtMs,
         });
         const safeEffectiveTimeSec = Number.isFinite(effectiveTimeSec) ? Math.max(0, effectiveTimeSec) : 0;
 
@@ -142,9 +146,11 @@ const FlyingScreen = ({
     }, [
         anchorServerTsMs,
         anchorTimeSec,
+        clientReceivedAtMs,
         currentVideoId,
         playbackRate,
         playbackStatus,
+        serverNowMs,
     ]);
 
     useEffect(() => {
