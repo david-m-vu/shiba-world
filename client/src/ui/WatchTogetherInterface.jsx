@@ -347,14 +347,16 @@ const WatchTogetherInterface = ({ isOpen }) => {
 
         // compare player's current time (currentPlayerTime) with server derived target time (safeEffectiveTimeSec)
         // if difference in current time and server time is big enough, then we correct the player time with seekTo
-        const allowedDrift = playbackStatus === "playing" ? 5 : 5; // originally 0.5 and 0.1
+        const allowedDrift = playbackStatus === "playing" ? 0.5 : 0.1; // originally 0.5 and 0.1
         if (Math.abs(currentPlayerTime - safeEffectiveTimeSec) > allowedDrift) {
-            suppressPlayerEvents(2000);// originally 450
+            console.log("syncPlayerToWatchState: syncing player time from", currentPlayerTime, "to", safeEffectiveTimeSec, "with playback status", playbackStatus, "at server time", anchorServerTsMs)
+            suppressPlayerEvents(450);// originally 450
             player.seekTo?.(safeEffectiveTimeSec, true);
         }
 
         if (playbackStatus === "playing") {
             if (currentPlayerState !== window.YT.PlayerState.PLAYING) {
+                console.log("syncPlayerToWatchState: syncing from pause to play state at server time", safeEffectiveTimeSec, "player time", currentPlayerTime)
                 suppressPlayerEvents(450);
                 player.playVideo?.();
             }
