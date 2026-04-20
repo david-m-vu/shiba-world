@@ -347,9 +347,9 @@ const WatchTogetherInterface = ({ isOpen }) => {
 
         // compare player's current time (currentPlayerTime) with server derived target time (safeEffectiveTimeSec)
         // if difference in current time and server time is big enough, then we correct the player time with seekTo
-        const allowedDrift = playbackStatus === "playing" ? 0.5 : 0.1;
+        const allowedDrift = playbackStatus === "playing" ? 2.0 : 0.5; // originally 0.5 and 0.1
         if (Math.abs(currentPlayerTime - safeEffectiveTimeSec) > allowedDrift) {
-            suppressPlayerEvents(450);
+            suppressPlayerEvents(1000);// originally 450
             player.seekTo?.(safeEffectiveTimeSec, true);
         }
 
