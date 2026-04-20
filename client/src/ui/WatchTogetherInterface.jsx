@@ -347,9 +347,9 @@ const WatchTogetherInterface = ({ isOpen }) => {
 
         // compare player's current time (currentPlayerTime) with server derived target time (safeEffectiveTimeSec)
         // if difference in current time and server time is big enough, then we correct the player time with seekTo
-        const allowedDrift = playbackStatus === "playing" ? 2.0 : 0.5; // originally 0.5 and 0.1
+        const allowedDrift = playbackStatus === "playing" ? 5 : 5; // originally 0.5 and 0.1
         if (Math.abs(currentPlayerTime - safeEffectiveTimeSec) > allowedDrift) {
-            suppressPlayerEvents(1000);// originally 450
+            suppressPlayerEvents(2000);// originally 450
             player.seekTo?.(safeEffectiveTimeSec, true);
         }
 
@@ -540,7 +540,7 @@ const WatchTogetherInterface = ({ isOpen }) => {
     // this effect syncs the client side to the server authoritative state with syncPlayerToWatchState whenever it updates
     // syncPlayerToWatchState() is set to update when the global zustand watchTogether state updates, which happens from the socket event listener
     useEffect(() => {
-        // console.log(`sync player to watch state at ${Date.now()}`)
+        console.log(`sync player to watch state at ${Date.now()}`)
         syncPlayerToWatchState();
     }, [syncPlayerToWatchState]);
 
